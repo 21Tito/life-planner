@@ -10,7 +10,16 @@ export default async function InvitePage({
   const { token } = await params;
   const supabase = await createClient();
 
-  // Look up the invite
+  // Must be logged in before we can read the invite (RLS requires auth)
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect(`/login?redirect=/invite/${token}`);
+  }
+
+  // Now look up the invite
   const { data: invite } = await supabase
     .from("household_invites")
     .select("owner_id")
@@ -37,16 +46,6 @@ export default async function InvitePage({
     .select("full_name")
     .eq("id", invite.owner_id)
     .single();
-
-  // Check if current user is logged in
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  // If not logged in, redirect to login with a callback to this page
-  if (!user) {
-    redirect(`/login?redirect=/invite/${token}`);
-  }
 
   // Already the owner
   if (user.id === invite.owner_id) {
