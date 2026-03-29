@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { getOwnerId } from "@/lib/get-owner-id";
 import { generateTripItinerary } from "@/lib/claude";
 import { NextResponse } from "next/server";
 
@@ -12,6 +13,8 @@ export async function POST(request: Request) {
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const ownerId = await getOwnerId(supabase, user.id);
 
     const body = await request.json();
     const { destination, start_date, end_date, interests, budget, notes } = body;
@@ -30,7 +33,7 @@ export async function POST(request: Request) {
     const { data: trip, error: tripError } = await supabase
       .from("trips")
       .insert({
-        user_id: user.id,
+        user_id: ownerId,
         title: itinerary.title,
         destination,
         start_date,
@@ -49,7 +52,7 @@ export async function POST(request: Request) {
         .from("trip_days")
         .insert({
           trip_id: trip.id,
-          user_id: user.id,
+          user_id: ownerId,
           day_number: day.day_number,
           date: day.date,
           title: day.title,
@@ -74,7 +77,7 @@ export async function POST(request: Request) {
             sort_order: number;
           }) => ({
             trip_day_id: tripDay.id,
-            user_id: user.id,
+            user_id: ownerId,
             title: activity.title,
             description: activity.description,
             category: activity.category,

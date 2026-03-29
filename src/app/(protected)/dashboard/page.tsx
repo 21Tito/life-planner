@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { getOwnerId } from "@/lib/get-owner-id";
 import Link from "next/link";
 import { StatCard } from "@/components/ui/stat-card";
 import { Icons } from "@/components/ui/icons";
@@ -10,17 +11,19 @@ export default async function DashboardPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
+  const ownerId = await getOwnerId(supabase, user!.id);
+
   const [{ data: mealPlans }, { data: trips }] = await Promise.all([
     supabase
       .from("meal_plans")
       .select("*")
-      .eq("user_id", user!.id)
+      .eq("user_id", ownerId)
       .order("created_at", { ascending: false })
       .limit(3),
     supabase
       .from("trips")
       .select("*")
-      .eq("user_id", user!.id)
+      .eq("user_id", ownerId)
       .order("created_at", { ascending: false })
       .limit(3),
   ]);

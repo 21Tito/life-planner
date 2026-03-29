@@ -1,0 +1,71 @@
+import { createClient } from "@/lib/supabase/server";
+import { NextResponse } from "next/server";
+
+// POST { token } — accept an invite and join the owner's household
+export async function POST(request: Request) {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { token } = await request.json();
+    if (!token) {
+      return NextResponse.json({ error: "token required" }, { status: 400 });
+    }
+
+    // Look up the invite
+    const { data: invite } = await supabase
+      .from("household_invites")
+      .select("owner_id")
+      .eq("token", token)
+      .single();
+
+    if (!invite) {
+      return NextResponse.json(
+        { error: "Invite not found or has been revoked" },
+        { status: 404 }
+      );
+    }
+
+    if (invite.owner_id === user.id) {
+      return NextResponse.json(
+        { error: "You cannot join your own household" },
+        { status: 400 }
+      );
+    }
+
+    // Check if already a member somewhere
+    const { data: existing } = await supabase
+      .from("household_members")
+      .select("owner_id")
+      .eq("member_id", user.id)
+      .single();
+
+    if (existing) {
+      if (existing.owner_id === invite.owner_id) {
+        return NextResponse.json({ alreadyMember: true });
+      }
+      return NextResponse.json(
+        { error: "You are already a member of another household" },
+        { status: 400 }
+      );
+    }
+
+    const { error } = await supabase.from("household_members").insert({
+      owner_id: invite.owner_id,
+      member_id: user.id,
+    });
+
+    if (error) throw error;
+
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to accept invite";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}

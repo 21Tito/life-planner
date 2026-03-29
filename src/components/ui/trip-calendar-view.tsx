@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { useOwnerId } from "@/lib/household-context";
 import type { TripDay, TripActivity, ActivityCategory } from "@/types";
 
 // ─── Category config ──────────────────────────────────────────────────────────
@@ -919,19 +920,12 @@ export function TripCalendarView({
   days: DayWithActivities[];
 }) {
   const supabase = createClient();
+  const userId = useOwnerId();
 
   const [days, setDays] = useState<DayWithActivities[]>(initialDays);
   const [view, setView] = useState<"calendar" | "list">("calendar");
   const [editorState, setEditorState] = useState<EditorState | null>(null);
   const [saving, setSaving] = useState(false);
-  const [userId, setUserId] = useState<string | null>(null);
-
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      setUserId(user?.id ?? null);
-    });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   function openAddEditor(dayId: string, dayDate: string, hour: number) {
     setEditorState({

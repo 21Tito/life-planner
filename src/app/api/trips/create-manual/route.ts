@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { getOwnerId } from "@/lib/get-owner-id";
 import { NextResponse } from "next/server";
 
 export async function POST(request: Request) {
@@ -11,6 +12,8 @@ export async function POST(request: Request) {
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const ownerId = await getOwnerId(supabase, user.id);
 
     const { destination, start_date, end_date, budget, notes } =
       await request.json();
@@ -26,7 +29,7 @@ export async function POST(request: Request) {
     const { data: trip, error: tripError } = await supabase
       .from("trips")
       .insert({
-        user_id: user.id,
+        user_id: ownerId,
         title: `${destination} Trip`,
         destination,
         start_date,
@@ -51,7 +54,7 @@ export async function POST(request: Request) {
     while (current <= end) {
       daysToInsert.push({
         trip_id: trip.id,
-        user_id: user.id,
+        user_id: ownerId,
         day_number: dayNumber,
         date: current.toISOString().split("T")[0],
         title: null,

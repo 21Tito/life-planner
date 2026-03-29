@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/client";
 import { useState } from "react";
+import { useOwnerId } from "@/lib/household-context";
 import type { PantryItem, PantryCategory } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,6 +33,7 @@ interface Props {
 
 export function MealsClient({ initialPantryItems }: Props) {
   const supabase = createClient();
+  const ownerId = useOwnerId();
   const [pantryItems, setPantryItems] = useState<PantryItem[]>(initialPantryItems);
   const [newItem, setNewItem] = useState({ name: "", category: "other" as PantryCategory, quantity: "" });
   const [preferences, setPreferences] = useState("");
@@ -42,12 +44,10 @@ export function MealsClient({ initialPantryItems }: Props) {
 
   async function addItem() {
     if (!newItem.name.trim()) return;
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
 
     const { data } = await supabase
       .from("pantry_items")
-      .insert({ ...newItem, user_id: user.id })
+      .insert({ ...newItem, user_id: ownerId })
       .select()
       .single();
 
