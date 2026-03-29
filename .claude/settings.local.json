@@ -13,7 +13,13 @@
       "Read(//c/Users/theoy/.ssh/**)",
       "Bash(ssh-keygen -t ed25519 -C \"theoyeh@gmail.com\" -f ~/.ssh/id_ed25519 -N \"\")",
       "Bash(ssh -T git@github.com)",
-      "Bash(curl -s http://localhost:3001)"
+      "Bash(curl -s http://localhost:3001)",
+      "Bash(where gh:*)",
+      "Bash(winget list:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npx shadcn@latest init --style new-york --base-color slate --yes)",
+      "Bash(npx shadcn@latest init --help)",
+      "Bash(npx shadcn@latest init -y -d)"
     ]
   }
 }
