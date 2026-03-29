@@ -1,5 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
+import { StatCard } from "@/components/ui/stat-card";
+import { Icons } from "@/components/ui/icons";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -7,7 +9,6 @@ export default async function DashboardPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // Fetch recent data
   const [{ data: mealPlans }, { data: trips }] = await Promise.all([
     supabase
       .from("meal_plans")
@@ -23,6 +24,9 @@ export default async function DashboardPage() {
       .limit(3),
   ]);
 
+  const mealCount = mealPlans?.length ?? 0;
+  const tripCount = trips?.length ?? 0;
+
   return (
     <div className="max-w-4xl">
       <h1
@@ -31,49 +35,63 @@ export default async function DashboardPage() {
       >
         Good {getGreeting()}
       </h1>
-      <p className="text-[var(--color-text-muted)] mb-10">
+      <p className="text-[var(--color-text-muted)] mb-8">
         Here&apos;s what&apos;s on your plate — literally and figuratively.
       </p>
 
-      <div className="grid gap-6 sm:grid-cols-2">
-        {/* Meal Planner Card */}
+      {/* Stat cards row */}
+      <div className="grid grid-cols-2 gap-4 mb-10">
+        <StatCard
+          label="Meal Plans"
+          value={mealCount}
+          icon={Icons.clipboard}
+          trend={mealCount > 0 ? `${mealCount} created` : undefined}
+        />
+        <StatCard
+          label="Trips Planned"
+          value={tripCount}
+          icon={Icons.map}
+          trend={tripCount > 0 ? `${tripCount} planned` : undefined}
+        />
+      </div>
+
+      {/* Feature cards */}
+      <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--color-text-muted)] mb-4">
+        Quick Actions
+      </h2>
+      <div className="grid gap-4 sm:grid-cols-2">
         <Link
           href="/meals"
-          className="group relative rounded-2xl border border-[var(--color-border)] bg-white p-6 shadow-sm hover:shadow-md transition-all hover:border-[var(--color-brand-300)]"
+          className="group rounded-xl border border-[var(--color-border)] bg-white p-6 shadow-sm hover:shadow-md transition-all hover:border-[var(--color-brand-300)]"
         >
-          <span className="text-3xl mb-3 block">🍽</span>
-          <h2 className="text-lg font-semibold mb-1">Meal Planner</h2>
-          <p className="text-sm text-[var(--color-text-muted)] mb-4">
+          <div className="w-10 h-10 rounded-lg bg-[var(--color-brand-50)] flex items-center justify-center text-[var(--color-brand-400)] mb-4">
+            {Icons.clipboard}
+          </div>
+          <h3 className="text-base font-semibold mb-1">Meal Planner</h3>
+          <p className="text-sm text-[var(--color-text-muted)]">
             Plan your week&apos;s meals based on what&apos;s in your fridge
           </p>
-          {mealPlans && mealPlans.length > 0 ? (
-            <p className="text-xs text-[var(--color-brand-600)] font-medium">
-              {mealPlans.length} plan{mealPlans.length !== 1 ? "s" : ""} created
-            </p>
-          ) : (
-            <p className="text-xs text-[var(--color-text-muted)]">
-              No plans yet — create your first one
+          {mealCount > 0 && (
+            <p className="text-xs font-medium text-[var(--color-brand-600)] mt-3">
+              {mealCount} plan{mealCount !== 1 ? "s" : ""} created →
             </p>
           )}
         </Link>
 
-        {/* Trip Planner Card */}
         <Link
           href="/trips"
-          className="group relative rounded-2xl border border-[var(--color-border)] bg-white p-6 shadow-sm hover:shadow-md transition-all hover:border-[var(--color-brand-300)]"
+          className="group rounded-xl border border-[var(--color-border)] bg-white p-6 shadow-sm hover:shadow-md transition-all hover:border-[var(--color-brand-300)]"
         >
-          <span className="text-3xl mb-3 block">✈️</span>
-          <h2 className="text-lg font-semibold mb-1">Trip Planner</h2>
-          <p className="text-sm text-[var(--color-text-muted)] mb-4">
+          <div className="w-10 h-10 rounded-lg bg-[var(--color-brand-50)] flex items-center justify-center text-[var(--color-brand-400)] mb-4">
+            {Icons.map}
+          </div>
+          <h3 className="text-base font-semibold mb-1">Trip Planner</h3>
+          <p className="text-sm text-[var(--color-text-muted)]">
             Plan your next adventure with a day-by-day itinerary
           </p>
-          {trips && trips.length > 0 ? (
-            <p className="text-xs text-[var(--color-brand-600)] font-medium">
-              {trips.length} trip{trips.length !== 1 ? "s" : ""} planned
-            </p>
-          ) : (
-            <p className="text-xs text-[var(--color-text-muted)]">
-              No trips yet — start planning
+          {tripCount > 0 && (
+            <p className="text-xs font-medium text-[var(--color-brand-600)] mt-3">
+              {tripCount} trip{tripCount !== 1 ? "s" : ""} planned →
             </p>
           )}
         </Link>
