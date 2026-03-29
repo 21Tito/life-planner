@@ -67,35 +67,36 @@ export function TripsClient({ initialTrips }: Props) {
 
   return (
     <div className="max-w-4xl">
-      <div className="flex items-center justify-between mb-8">
+      {/* Header */}
+      <div className="flex items-start justify-between mb-6 lg:mb-8 gap-4">
         <div>
           <h1
-            className="text-3xl font-bold mb-1"
+            className="text-2xl lg:text-3xl font-bold mb-1"
             style={{ fontFamily: "var(--font-display)" }}
           >
             Trip Planner
           </h1>
-          <p className="text-[var(--color-text-muted)]">
+          <p className="text-sm text-[var(--color-text-muted)]">
             Plan your next adventure with AI-generated itineraries.
           </p>
         </div>
         <button
           onClick={() => setShowForm(!showForm)}
-          className="flex items-center gap-2 rounded-full bg-[var(--color-brand-600)] px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[var(--color-brand-700)] transition-colors"
+          className="flex items-center gap-2 rounded-full bg-[var(--color-brand-600)] px-4 lg:px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[var(--color-brand-700)] transition-colors flex-shrink-0"
         >
           {showForm ? (
-            <><span>{Icons.close}</span> Cancel</>
+            <><span>{Icons.close}</span><span className="hidden sm:inline">Cancel</span></>
           ) : (
-            <><span>{Icons.plus}</span> New Trip</>
+            <><span>{Icons.plus}</span><span>New Trip</span></>
           )}
         </button>
       </div>
 
       {/* Create Trip Form */}
       {showForm && (
-        <div className="rounded-xl border border-[var(--color-border)] bg-white p-6 mb-8 shadow-sm">
-          <h2 className="text-base font-semibold mb-5">Plan a new trip</h2>
-          <div className="grid gap-4 sm:grid-cols-2">
+        <div className="rounded-xl border border-[var(--color-border)] bg-white p-5 lg:p-6 mb-6 lg:mb-8 shadow-sm">
+          <h2 className="text-base font-semibold mb-4 lg:mb-5">Plan a new trip</h2>
+          <div className="grid gap-3 lg:gap-4 grid-cols-1 sm:grid-cols-2">
             <div className="sm:col-span-2">
               <label className="block text-sm font-medium mb-1.5">Destination</label>
               <input
@@ -131,7 +132,7 @@ export function TripsClient({ initialTrips }: Props) {
               </label>
               <input
                 type="text"
-                placeholder="e.g. food, history, street art, beaches, nightlife"
+                placeholder="e.g. food, history, street art, beaches"
                 value={form.interests}
                 onChange={(e) => setForm({ ...form, interests: e.target.value })}
                 className={inputClass}
@@ -157,27 +158,21 @@ export function TripsClient({ initialTrips }: Props) {
               </label>
               <input
                 type="text"
-                placeholder="e.g. traveling with partner, prefer walkable areas"
+                placeholder="e.g. traveling with partner"
                 value={form.notes}
                 onChange={(e) => setForm({ ...form, notes: e.target.value })}
                 className={inputClass}
               />
             </div>
           </div>
-          <div className="mt-6 flex items-center gap-3">
+          <div className="mt-5 lg:mt-6">
             <button
               onClick={handleGenerate}
               disabled={generating || !form.destination || !form.start_date || !form.end_date}
-              className="flex items-center gap-2 rounded-full bg-[var(--color-brand-600)] px-8 py-3 text-sm font-semibold text-white shadow-sm hover:bg-[var(--color-brand-700)] transition-colors disabled:opacity-50"
+              className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-full bg-[var(--color-brand-600)] px-8 py-3 text-sm font-semibold text-white shadow-sm hover:bg-[var(--color-brand-700)] transition-colors disabled:opacity-50"
             >
               <span className="text-white">{Icons.sparkle}</span>
               {generating ? "Generating itinerary..." : "Generate Itinerary"}
-            </button>
-            <button
-              onClick={() => setShowForm(false)}
-              className="px-5 py-3 text-sm font-medium text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors"
-            >
-              Cancel
             </button>
           </div>
         </div>
@@ -198,16 +193,16 @@ export function TripsClient({ initialTrips }: Props) {
             <Link
               key={trip.id}
               href={`/trips/${trip.id}`}
-              className="block rounded-xl border border-[var(--color-border)] bg-white p-5 shadow-sm hover:shadow-md transition-all hover:border-[var(--color-brand-300)]"
+              className="block rounded-xl border border-[var(--color-border)] bg-white p-4 lg:p-5 shadow-sm hover:shadow-md transition-all hover:border-[var(--color-brand-300)]"
             >
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex items-start gap-4 min-w-0">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start gap-3 min-w-0">
                   <div className="w-9 h-9 rounded-lg bg-[var(--color-brand-50)] flex items-center justify-center text-[var(--color-brand-400)] flex-shrink-0 mt-0.5">
                     {Icons.map}
                   </div>
                   <div className="min-w-0">
                     <h3 className="font-semibold truncate">{trip.title}</h3>
-                    <p className="text-sm text-[var(--color-text-muted)] mt-0.5">
+                    <p className="text-xs lg:text-sm text-[var(--color-text-muted)] mt-0.5 truncate">
                       {trip.destination} · {formatDate(trip.start_date)} – {formatDate(trip.end_date)}
                     </p>
                   </div>

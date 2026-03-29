@@ -91,12 +91,12 @@ export function MealsClient({ initialPantryItems }: Props) {
   return (
     <div className="max-w-5xl">
       <h1
-        className="text-3xl font-bold mb-1"
+        className="text-2xl lg:text-3xl font-bold mb-1"
         style={{ fontFamily: "var(--font-display)" }}
       >
         Meal Planner
       </h1>
-      <p className="text-[var(--color-text-muted)] mb-8">
+      <p className="text-sm text-[var(--color-text-muted)] mb-6 lg:mb-8">
         Add what&apos;s in your fridge, then let AI plan your week.
       </p>
 
@@ -106,7 +106,7 @@ export function MealsClient({ initialPantryItems }: Props) {
           <button
             key={key}
             onClick={() => setActiveTab(key)}
-            className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${
+            className={`px-3 lg:px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${
               activeTab === key
                 ? "border-[var(--color-brand-600)] text-[var(--color-brand-600)]"
                 : "border-transparent text-[var(--color-text-muted)] hover:text-[var(--color-text)]"
@@ -120,40 +120,43 @@ export function MealsClient({ initialPantryItems }: Props) {
       {/* Pantry Tab */}
       {activeTab === "pantry" && (
         <div>
-          <div className="flex gap-3 mb-6">
+          {/* Add item form — single row on desktop, stacked on mobile */}
+          <div className="flex flex-col gap-2 mb-6 sm:flex-row sm:gap-3">
             <input
               type="text"
               placeholder="Item name (e.g. chicken breast)"
               value={newItem.name}
               onChange={(e) => setNewItem({ ...newItem, name: e.target.value })}
               onKeyDown={(e) => e.key === "Enter" && addItem()}
-              className="flex-1 rounded-lg border border-[var(--color-border)] px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-300)] bg-white"
+              className="w-full rounded-lg border border-[var(--color-border)] px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-300)] bg-white"
             />
-            <select
-              value={newItem.category}
-              onChange={(e) => setNewItem({ ...newItem, category: e.target.value as PantryCategory })}
-              className="rounded-lg border border-[var(--color-border)] px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-300)]"
-            >
-              {CATEGORIES.map((cat) => (
-                <option key={cat} value={cat}>
-                  {cat.charAt(0).toUpperCase() + cat.slice(1)}
-                </option>
-              ))}
-            </select>
-            <input
-              type="text"
-              placeholder="Qty"
-              value={newItem.quantity}
-              onChange={(e) => setNewItem({ ...newItem, quantity: e.target.value })}
-              className="w-24 rounded-lg border border-[var(--color-border)] px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-300)] bg-white"
-            />
-            <button
-              onClick={addItem}
-              className="flex items-center gap-2 rounded-lg bg-[var(--color-brand-600)] px-5 py-2.5 text-sm font-medium text-white hover:bg-[var(--color-brand-700)] transition-colors"
-            >
-              <span className="text-white">{Icons.plus}</span>
-              Add
-            </button>
+            <div className="flex gap-2">
+              <select
+                value={newItem.category}
+                onChange={(e) => setNewItem({ ...newItem, category: e.target.value as PantryCategory })}
+                className="flex-1 rounded-lg border border-[var(--color-border)] px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-300)]"
+              >
+                {CATEGORIES.map((cat) => (
+                  <option key={cat} value={cat}>
+                    {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                  </option>
+                ))}
+              </select>
+              <input
+                type="text"
+                placeholder="Qty"
+                value={newItem.quantity}
+                onChange={(e) => setNewItem({ ...newItem, quantity: e.target.value })}
+                className="w-20 rounded-lg border border-[var(--color-border)] px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-300)] bg-white"
+              />
+              <button
+                onClick={addItem}
+                className="flex items-center gap-1.5 rounded-lg bg-[var(--color-brand-600)] px-4 py-2.5 text-sm font-medium text-white hover:bg-[var(--color-brand-700)] transition-colors whitespace-nowrap"
+              >
+                <span className="text-white">{Icons.plus}</span>
+                Add
+              </button>
+            </div>
           </div>
 
           {pantryItems.length === 0 ? (
@@ -171,16 +174,16 @@ export function MealsClient({ initialPantryItems }: Props) {
                   key={item.id}
                   className="flex items-center justify-between rounded-lg border border-[var(--color-border)] bg-white px-4 py-3 hover:border-[var(--color-brand-200)] transition-colors"
                 >
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 lg:gap-3 min-w-0">
                     <Tag>{item.category}</Tag>
-                    <span className="text-sm font-medium">{item.name}</span>
+                    <span className="text-sm font-medium truncate">{item.name}</span>
                     {item.quantity && (
-                      <span className="text-sm text-[var(--color-text-muted)]">· {item.quantity}</span>
+                      <span className="text-sm text-[var(--color-text-muted)] hidden sm:inline">· {item.quantity}</span>
                     )}
                   </div>
                   <button
                     onClick={() => removeItem(item.id)}
-                    className="text-[var(--color-text-muted)] hover:text-red-500 transition-colors p-1 rounded"
+                    className="text-[var(--color-text-muted)] hover:text-red-500 transition-colors p-1 rounded flex-shrink-0 ml-2"
                     aria-label="Remove item"
                   >
                     {Icons.close}
@@ -193,7 +196,7 @@ export function MealsClient({ initialPantryItems }: Props) {
           {pantryItems.length > 0 && (
             <div className="mt-8 border-t border-[var(--color-border)] pt-6">
               <textarea
-                placeholder="Any dietary preferences? (e.g. vegetarian, low-carb, no shellfish, quick meals under 30 min)"
+                placeholder="Any dietary preferences? (e.g. vegetarian, low-carb, no shellfish)"
                 value={preferences}
                 onChange={(e) => setPreferences(e.target.value)}
                 className="w-full rounded-lg border border-[var(--color-border)] px-4 py-3 text-sm mb-4 focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-300)] resize-none bg-white"
@@ -202,7 +205,7 @@ export function MealsClient({ initialPantryItems }: Props) {
               <button
                 onClick={generatePlan}
                 disabled={generating}
-                className="flex items-center gap-2 rounded-full bg-[var(--color-brand-600)] px-8 py-3 text-sm font-semibold text-white shadow-sm hover:bg-[var(--color-brand-700)] transition-colors disabled:opacity-50"
+                className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-full bg-[var(--color-brand-600)] px-8 py-3 text-sm font-semibold text-white shadow-sm hover:bg-[var(--color-brand-700)] transition-colors disabled:opacity-50"
               >
                 <span className="text-white">{Icons.sparkle}</span>
                 {generating ? "Generating meal plan..." : "Generate Meal Plan"}
@@ -212,7 +215,7 @@ export function MealsClient({ initialPantryItems }: Props) {
         </div>
       )}
 
-      {/* Meal Plan Tab */}
+      {/* Meal Plan Tab — horizontal scroll on mobile */}
       {activeTab === "plan" && (
         <div>
           {Object.keys(mealPlan).length === 0 ? (
@@ -224,45 +227,49 @@ export function MealsClient({ initialPantryItems }: Props) {
               <p className="text-sm mt-1">Add items to your fridge and generate one.</p>
             </div>
           ) : (
-            <div className="overflow-x-auto rounded-xl border border-[var(--color-border)] bg-white shadow-sm">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-[var(--color-border)] bg-[var(--color-surface-alt)]">
-                    <th className="text-left py-3 px-4 font-semibold text-xs uppercase tracking-wider text-[var(--color-text-muted)]">
-                      Meal
-                    </th>
-                    {DAY_NAMES.map((day) => (
-                      <th key={day} className="text-left py-3 px-3 font-semibold text-xs uppercase tracking-wider text-[var(--color-text-muted)]">
-                        {day}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {MEAL_TYPES.map((type, i) => (
-                    <tr key={type} className={`border-b border-[var(--color-border)] ${i % 2 === 0 ? "bg-white" : "bg-[var(--color-surface)]"}`}>
-                      <td className="py-3 px-4 font-semibold capitalize text-xs text-[var(--color-brand-600)]">
-                        {type}
-                      </td>
-                      {DAY_NAMES.map((_, dayIdx) => {
-                        const meal = mealPlan[`${dayIdx}-${type}`];
-                        return (
-                          <td key={dayIdx} className="py-3 px-3">
-                            {meal ? (
-                              <div>
-                                <p className="font-medium text-xs">{meal.title}</p>
-                                <p className="text-xs text-[var(--color-text-muted)] mt-0.5 line-clamp-2">{meal.description}</p>
-                              </div>
-                            ) : (
-                              <span className="text-[var(--color-text-muted)]">—</span>
-                            )}
+            <div className="-mx-4 lg:mx-0 overflow-x-auto">
+              <div className="min-w-[600px] px-4 lg:px-0">
+                <div className="rounded-xl border border-[var(--color-border)] bg-white shadow-sm overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-[var(--color-border)] bg-[var(--color-surface-alt)]">
+                        <th className="text-left py-3 px-4 font-semibold text-xs uppercase tracking-wider text-[var(--color-text-muted)]">
+                          Meal
+                        </th>
+                        {DAY_NAMES.map((day) => (
+                          <th key={day} className="text-left py-3 px-3 font-semibold text-xs uppercase tracking-wider text-[var(--color-text-muted)]">
+                            {day}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {MEAL_TYPES.map((type, i) => (
+                        <tr key={type} className={`border-b border-[var(--color-border)] ${i % 2 === 0 ? "bg-white" : "bg-[var(--color-surface)]"}`}>
+                          <td className="py-3 px-4 font-semibold capitalize text-xs text-[var(--color-brand-600)]">
+                            {type}
                           </td>
-                        );
-                      })}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                          {DAY_NAMES.map((_, dayIdx) => {
+                            const meal = mealPlan[`${dayIdx}-${type}`];
+                            return (
+                              <td key={dayIdx} className="py-3 px-3">
+                                {meal ? (
+                                  <div>
+                                    <p className="font-medium text-xs">{meal.title}</p>
+                                    <p className="text-xs text-[var(--color-text-muted)] mt-0.5 line-clamp-2">{meal.description}</p>
+                                  </div>
+                                ) : (
+                                  <span className="text-[var(--color-text-muted)]">—</span>
+                                )}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
           )}
         </div>

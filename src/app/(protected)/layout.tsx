@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { Sidebar } from "@/components/layout/sidebar";
+import { MobileNav } from "@/components/layout/mobile-nav";
 
 export default async function ProtectedLayout({
   children,
@@ -31,7 +32,11 @@ export default async function ProtectedLayout({
           avatar: profile?.avatar_url ?? undefined,
         }}
       />
-      <main className="flex-1 px-6 py-8 lg:px-10">{children}</main>
+      {/* pt-14 clears mobile top header; pb-24 clears mobile bottom nav */}
+      <main className="flex-1 px-4 pt-20 pb-24 lg:px-10 lg:py-8 lg:pt-8 lg:pb-8">
+        {children}
+      </main>
+      <MobileNav />
     </div>
   );
 }

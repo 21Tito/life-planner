@@ -50,9 +50,9 @@ export default function HomePage() {
 
   return (
     <main className="min-h-screen bg-[var(--color-surface)] flex flex-col">
-      {/* Nav bar */}
-      <nav className="border-b border-[var(--color-border)] bg-white px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
+      {/* Nav */}
+      <nav className="border-b border-[var(--color-border)] bg-white px-4 lg:px-6 py-4 flex items-center justify-between">
+        <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded-md bg-[var(--color-brand-600)] flex items-center justify-center text-white text-xs font-bold">
             LP
           </div>
@@ -70,29 +70,28 @@ export default function HomePage() {
       </nav>
 
       {/* Hero */}
-      <div className="flex-1 flex flex-col items-center justify-center px-6 py-20 text-center">
-        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[var(--color-brand-50)] text-[var(--color-brand-600)] text-xs font-semibold mb-6">
+      <div className="flex-1 flex flex-col items-center justify-center px-4 lg:px-6 py-16 lg:py-20 text-center">
+        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[var(--color-brand-50)] text-[var(--color-brand-600)] text-xs font-semibold mb-5 lg:mb-6">
           <span className="text-[var(--color-brand-400)]">{Icons.sparkle}</span>
           AI-powered planning
         </div>
 
         <h1
-          className="text-5xl sm:text-7xl font-bold tracking-tight text-[var(--color-text)] mb-6"
+          className="text-4xl sm:text-5xl lg:text-7xl font-bold tracking-tight text-[var(--color-text)] mb-4 lg:mb-6"
           style={{ fontFamily: "var(--font-display)" }}
         >
           Life, planned.
         </h1>
 
-        <p className="max-w-xl text-lg leading-8 text-[var(--color-text-muted)] mb-10">
+        <p className="max-w-sm lg:max-w-xl text-base lg:text-lg leading-7 lg:leading-8 text-[var(--color-text-muted)] mb-8 lg:mb-10">
           AI-powered meal planning from what&apos;s in your fridge, and trip
-          itineraries that actually make sense. Your personal planner that
-          learns what you like.
+          itineraries that actually make sense.
         </p>
 
         <button
           onClick={signInWithGoogle}
           disabled={loading}
-          className="flex items-center justify-center gap-3 rounded-full border border-[var(--color-border)] bg-white px-8 py-3.5 text-sm font-semibold shadow-sm hover:shadow-md hover:border-[var(--color-brand-300)] transition-all disabled:opacity-50"
+          className="w-full max-w-xs flex items-center justify-center gap-3 rounded-full border border-[var(--color-border)] bg-white px-6 lg:px-8 py-3.5 text-sm font-semibold shadow-sm hover:shadow-md hover:border-[var(--color-brand-300)] transition-all disabled:opacity-50"
         >
           <svg className="h-5 w-5 flex-shrink-0" viewBox="0 0 24 24">
             <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
@@ -105,15 +104,17 @@ export default function HomePage() {
       </div>
 
       {/* Features */}
-      <div className="border-t border-[var(--color-border)] bg-white px-6 py-16">
-        <div className="max-w-4xl mx-auto grid gap-8 sm:grid-cols-3">
+      <div className="border-t border-[var(--color-border)] bg-white px-4 lg:px-6 py-12 lg:py-16">
+        <div className="max-w-4xl mx-auto grid gap-8 grid-cols-1 sm:grid-cols-3">
           {FEATURES.map(({ icon, title, description }) => (
-            <div key={title} className="flex flex-col items-start gap-3">
-              <div className="w-10 h-10 rounded-lg bg-[var(--color-brand-50)] flex items-center justify-center text-[var(--color-brand-400)]">
+            <div key={title} className="flex items-start gap-4 sm:flex-col sm:items-start sm:gap-3">
+              <div className="w-10 h-10 rounded-lg bg-[var(--color-brand-50)] flex items-center justify-center text-[var(--color-brand-400)] flex-shrink-0">
                 {icon}
               </div>
-              <h3 className="font-semibold text-sm">{title}</h3>
-              <p className="text-sm text-[var(--color-text-muted)] leading-relaxed">{description}</p>
+              <div>
+                <h3 className="font-semibold text-sm mb-1">{title}</h3>
+                <p className="text-sm text-[var(--color-text-muted)] leading-relaxed">{description}</p>
+              </div>
             </div>
           ))}
         </div>
