@@ -1,4 +1,4 @@
-// Badge component adapted from externship-ui SharedUI
+// Badge component
 
 type BadgeVariant = "default" | "success" | "warning" | "error" | "info" | "purple"
 

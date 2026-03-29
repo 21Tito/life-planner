@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 @theme {
-  /* Navy brand palette from externship-ui */
+  /* Navy brand palette */
   --color-brand-50:  #E8F0F7;
   --color-brand-100: #d5e8f3;
   --color-brand-200: #9DBAD8;
