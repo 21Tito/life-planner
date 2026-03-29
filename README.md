@@ -21,7 +21,7 @@ AI-powered personal life planner with meal planning and trip itinerary generatio
 ### 1. Clone and install
 
 ```bash
-git clone <your-repo-url>
+git clone git@github.com:21Tito/life-planner.git
 cd life-planner
 npm install
 ```
