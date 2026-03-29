@@ -27,6 +27,7 @@ export default async function ProtectedLayout({
     <div className="flex min-h-screen">
       <Sidebar
         user={{
+          id: user.id,
           email: user.email!,
           name: profile?.full_name ?? user.email!,
           avatar: profile?.avatar_url ?? undefined,

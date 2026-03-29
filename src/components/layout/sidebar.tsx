@@ -2,12 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
-import { useRouter } from "next/navigation";
 import { Icons } from "@/components/ui/icons";
+import { UserMenu } from "@/components/layout/user-menu";
 
 interface SidebarProps {
   user: {
+    id: string;
     email: string;
     name: string;
     avatar?: string;
@@ -22,43 +22,30 @@ const navItems = [
 
 export function Sidebar({ user }: SidebarProps) {
   const pathname = usePathname();
-  const router = useRouter();
-  const supabase = createClient();
-
-  async function handleSignOut() {
-    await supabase.auth.signOut();
-    router.push("/login");
-  }
 
   return (
     <>
       {/* Mobile top header */}
-      <header className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white border-b border-[var(--color-border)] px-4 h-14 flex items-center justify-between">
+      <header className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white border-b border-border px-4 h-14 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-md bg-[var(--color-brand-600)] flex items-center justify-center text-white text-xs font-bold">
+          <div className="w-7 h-7 rounded-md bg-primary flex items-center justify-center text-primary-foreground text-xs font-bold">
             LP
           </div>
           <span className="font-bold text-sm" style={{ fontFamily: "var(--font-display)" }}>
             Life Planner
           </span>
         </div>
-        {user.avatar ? (
-          <img src={user.avatar} alt="" className="h-8 w-8 rounded-full object-cover" />
-        ) : (
-          <div className="h-8 w-8 rounded-full bg-[var(--color-brand-200)] flex items-center justify-center text-sm font-bold text-[var(--color-brand-700)]">
-            {user.name.charAt(0).toUpperCase()}
-          </div>
-        )}
+        <UserMenu user={user} size="sm" dropdownPosition="bottom-right" />
       </header>
 
       {/* Desktop sidebar */}
-      <aside className="hidden lg:flex w-64 flex-col border-r border-[var(--color-border)] bg-white px-4 py-6">
+      <aside className="hidden lg:flex w-64 flex-col border-r border-border bg-card px-4 py-6">
         <div className="mb-8 px-2 flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-[var(--color-brand-600)] flex items-center justify-center text-white text-sm font-bold">
+          <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-primary-foreground text-sm font-bold">
             LP
           </div>
           <h2
-            className="text-lg font-bold text-[var(--color-text)]"
+            className="text-lg font-bold text-foreground"
             style={{ fontFamily: "var(--font-display)" }}
           >
             Life Planner
@@ -74,11 +61,11 @@ export function Sidebar({ user }: SidebarProps) {
                 href={item.href}
                 className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
                   isActive
-                    ? "bg-[var(--color-brand-50)] text-[var(--color-brand-700)]"
-                    : "text-[var(--color-text-muted)] hover:bg-[var(--color-surface-alt)] hover:text-[var(--color-text)]"
+                    ? "bg-secondary text-primary"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
                 }`}
               >
-                <span className={isActive ? "text-[var(--color-brand-400)]" : "text-[var(--color-text-muted)]"}>
+                <span className={isActive ? "text-primary/70" : "text-muted-foreground"}>
                   {item.icon}
                 </span>
                 {item.label}
@@ -87,27 +74,14 @@ export function Sidebar({ user }: SidebarProps) {
           })}
         </nav>
 
-        <div className="border-t border-[var(--color-border)] pt-4">
-          <div className="flex items-center gap-3 px-2 mb-3">
-            {user.avatar ? (
-              <img src={user.avatar} alt="" className="h-8 w-8 rounded-full object-cover" />
-            ) : (
-              <div className="h-8 w-8 rounded-full bg-[var(--color-brand-200)] flex items-center justify-center text-sm font-bold text-[var(--color-brand-700)]">
-                {user.name.charAt(0).toUpperCase()}
-              </div>
-            )}
+        <div className="border-t border-border pt-4">
+          <div className="flex items-center gap-3 px-2">
+            <UserMenu user={user} size="default" dropdownPosition="top-left" />
             <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold truncate">{user.name}</p>
-              <p className="text-xs text-[var(--color-text-muted)] truncate">{user.email}</p>
+              <p className="text-xs text-muted-foreground truncate">{user.email}</p>
             </div>
           </div>
-          <button
-            onClick={handleSignOut}
-            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface-alt)] rounded-lg transition-colors"
-          >
-            <span>{Icons.signOut}</span>
-            Sign out
-          </button>
         </div>
       </aside>
     </>
