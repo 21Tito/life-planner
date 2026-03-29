@@ -1,47 +1,39 @@
-// Badge component
+import * as React from "react"
+import { cva, type VariantProps } from "class-variance-authority"
+import { cn } from "@/lib/utils"
 
-type BadgeVariant = "default" | "success" | "warning" | "error" | "info" | "purple"
+const badgeVariants = cva(
+  "inline-flex h-5 w-fit shrink-0 items-center justify-center gap-1 overflow-hidden rounded-full border border-transparent px-2 py-0.5 text-xs font-medium whitespace-nowrap transition-all [&>svg]:size-3",
+  {
+    variants: {
+      variant: {
+        default:     "bg-primary text-primary-foreground",
+        secondary:   "bg-secondary text-secondary-foreground",
+        destructive: "bg-destructive/10 text-destructive",
+        outline:     "border-border text-foreground",
+        ghost:       "text-muted-foreground",
+        link:        "text-primary underline-offset-4 hover:underline",
+      },
+    },
+    defaultVariants: {
+      variant: "default",
+    },
+  }
+)
 
-const variantStyles: Record<BadgeVariant, string> = {
-  default:  "bg-[#F3F4F6] text-[#374151] border border-[#D1D5DB]",
-  success:  "bg-[#ECFDF5] text-[#059669] border border-[#A7F3D0]",
-  warning:  "bg-[#FFFBEB] text-[#D97706] border border-[#FDE68A]",
-  error:    "bg-[#FEF2F2] text-[#DC2626] border border-[#FECACA]",
-  info:     "bg-[#EFF6FF] text-[#2563EB] border border-[#BFDBFE]",
-  purple:   "bg-[#F5F3FF] text-[#7C3AED] border border-[#DDD6FE]",
-}
+export type BadgeVariant = NonNullable<VariantProps<typeof badgeVariants>["variant"]>
 
-interface BadgeProps {
-  children: React.ReactNode
-  variant?: BadgeVariant
-  dot?: boolean
-}
+interface BadgeProps
+  extends React.HTMLAttributes<HTMLSpanElement>,
+    VariantProps<typeof badgeVariants> {}
 
-export function Badge({ children, variant = "default", dot = false }: BadgeProps) {
+function Badge({ className, variant, ...props }: BadgeProps) {
   return (
-    <span className={`inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-semibold ${variantStyles[variant]}`}>
-      {dot && (
-        <span className="w-1.5 h-1.5 rounded-full bg-current" />
-      )}
-      {children}
-    </span>
+    <span
+      className={cn(badgeVariants({ variant }), className)}
+      {...props}
+    />
   )
 }
 
-// Category tag used for pantry items / labels
-export function Tag({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="inline-block px-2 py-0.5 rounded-full text-xs font-medium bg-[var(--color-brand-50)] text-[var(--color-brand-600)]">
-      {children}
-    </span>
-  )
-}
-
-// Duration / stat pill (e.g. "5 days")
-export function Pill({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="inline-block px-2.5 py-1 rounded-full text-xs font-medium bg-[var(--color-brand-50)] text-[var(--color-brand-700)]">
-      {children}
-    </span>
-  )
-}
+export { Badge, badgeVariants }
