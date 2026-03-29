@@ -18,6 +18,7 @@ const navItems = [
   { href: "/dashboard", label: "Dashboard",   icon: Icons.dashboard },
   { href: "/meals",     label: "Meal Planner", icon: Icons.clipboard },
   { href: "/trips",     label: "Trip Planner", icon: Icons.map },
+  { href: "/settings",  label: "Settings",     icon: Icons.settings },
 ];
 
 export function Sidebar({ user }: SidebarProps) {
