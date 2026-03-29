@@ -26,9 +26,9 @@ export function SettingsClient({ members, activeToken, isMember }: Props) {
   const [copied, setCopied] = useState(false);
   const [removing, setRemoving] = useState<string | null>(null);
 
-  const inviteLink = token
-    ? `${window.location.origin}/invite/${token}`
-    : null;
+  const baseUrl =
+    process.env.NEXT_PUBLIC_APP_URL ?? window.location.origin;
+  const inviteLink = token ? `${baseUrl}/invite/${token}` : null;
 
   async function generateLink() {
     setGenerating(true);
