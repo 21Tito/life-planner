@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run:*)",
+      "Bash(npm install:*)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(netstat -ano)",
+      "Bash(findstr :3000)",
+      "Bash(taskkill /PID 15616 /F)",
+      "Bash(cmd /c \"taskkill /PID 15616 /F\")",
+      "Bash(echo \"exit: $?\")",
+      "Bash(code --open-url http://localhost:3001)"
+    ]
+  }
+}
