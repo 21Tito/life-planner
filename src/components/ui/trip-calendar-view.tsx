@@ -75,6 +75,7 @@ const HOUR_HEIGHT = 80;
 const START_HOUR = 6;
 const END_HOUR = 23;
 const DAY_COL_WIDTH = 210;
+const DAY_COL_WIDTH_MOBILE = 72;
 const TIME_COL_WIDTH = 52;
 const TOTAL_HEIGHT = (END_HOUR - START_HOUR) * HOUR_HEIGHT;
 
@@ -637,11 +638,13 @@ function InlineEditCell({
 
 function CalendarGrid({
   days,
+  colWidth = DAY_COL_WIDTH,
   onCellClick,
   onActivityEdit,
   onUpdateDayField,
 }: {
   days: DayWithActivities[];
+  colWidth?: number;
   onCellClick?: (dayId: string, dayDate: string, hour: number) => void;
   onActivityEdit?: (activity: TripActivity, dayId: string) => void;
   onUpdateDayField?: (dayId: string, field: "title" | "notes", value: string) => void;
@@ -675,7 +678,7 @@ function CalendarGrid({
     >
       <div
         className="flex flex-col"
-        style={{ minWidth: `${TIME_COL_WIDTH + days.length * DAY_COL_WIDTH}px` }}
+        style={{ minWidth: `${TIME_COL_WIDTH + days.length * colWidth}px` }}
       >
         {/* ══ STICKY HEADER GROUP (sticks to top while scrolling down) ══ */}
         <div className="sticky top-0 z-20 flex flex-col">
@@ -686,24 +689,43 @@ function CalendarGrid({
               className="sticky left-0 z-10 bg-gray-50 border-r border-[var(--color-border)] flex-shrink-0"
               style={{ width: TIME_COL_WIDTH }}
             />
-            {days.map((day) => (
-              <div
-                key={day.id}
-                className="flex-shrink-0 border-r border-[var(--color-border)] last:border-r-0 px-3 py-2"
-                style={{ width: DAY_COL_WIDTH }}
-              >
-                <div className="text-[10px] font-bold tracking-wider text-[var(--color-brand-600)] uppercase">
-                  Day {day.day_number}
+            {days.map((day) => {
+              const d = new Date(day.date + "T00:00:00");
+              const isCompact = colWidth < 120;
+              return (
+                <div
+                  key={day.id}
+                  className="flex-shrink-0 border-r border-[var(--color-border)] last:border-r-0"
+                  style={{ width: colWidth }}
+                >
+                  {isCompact ? (
+                    /* Google Calendar-style compact header */
+                    <div className="flex flex-col items-center justify-center py-2 gap-0.5">
+                      <span className="text-[9px] font-semibold uppercase tracking-widest text-[var(--color-text-muted)]">
+                        {d.toLocaleDateString("en-US", { weekday: "short" })}
+                      </span>
+                      <span className="text-base font-bold text-[var(--color-brand-600)] leading-none">
+                        {d.getDate()}
+                      </span>
+                    </div>
+                  ) : (
+                    /* Desktop full header */
+                    <div className="px-3 py-2">
+                      <div className="text-[10px] font-bold tracking-wider text-[var(--color-brand-600)] uppercase">
+                        Day {day.day_number}
+                      </div>
+                      <div className="text-[11px] text-[var(--color-text-muted)] mt-0.5">
+                        {d.toLocaleDateString("en-US", {
+                          weekday: "short",
+                          month: "short",
+                          day: "numeric",
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
-                <div className="text-[11px] text-[var(--color-text-muted)] mt-0.5">
-                  {new Date(day.date + "T00:00:00").toLocaleDateString("en-US", {
-                    weekday: "short",
-                    month: "short",
-                    day: "numeric",
-                  })}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {/* Row 2: City */}
@@ -720,7 +742,7 @@ function CalendarGrid({
               <div
                 key={day.id}
                 className="flex-shrink-0 border-r border-[var(--color-border)] last:border-r-0"
-                style={{ width: DAY_COL_WIDTH }}
+                style={{ width: colWidth }}
               >
                 <InlineEditCell
                   value={day.title}
@@ -745,7 +767,7 @@ function CalendarGrid({
               <div
                 key={day.id}
                 className="flex-shrink-0 border-r border-[var(--color-border)] last:border-r-0"
-                style={{ width: DAY_COL_WIDTH }}
+                style={{ width: colWidth }}
               >
                 <InlineEditCell
                   value={day.notes}
@@ -808,7 +830,7 @@ function CalendarGrid({
                 <div
                   key={day.id}
                   className="flex-shrink-0 border-r border-[var(--color-border)] last:border-r-0"
-                  style={{ width: DAY_COL_WIDTH }}
+                  style={{ width: colWidth }}
                 >
                   {/* Anytime row */}
                   {hasUnscheduled && (
@@ -927,7 +949,6 @@ export function TripCalendarView({
   const [editorState, setEditorState] = useState<EditorState | null>(null);
   const [saving, setSaving] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
-  const [selectedDayIdx, setSelectedDayIdx] = useState(0);
 
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 639px)");
@@ -1094,7 +1115,7 @@ export function TripCalendarView({
     await supabase.from("trip_days").update({ [field]: updateValue }).eq("id", dayId);
   }
 
-  const visibleDays = isMobile ? [days[selectedDayIdx] ?? days[0]] : days;
+  const colWidth = isMobile ? DAY_COL_WIDTH_MOBILE : DAY_COL_WIDTH;
 
   return (
     <div className="flex flex-col gap-4">
@@ -1140,38 +1161,6 @@ export function TripCalendarView({
         </div>
       </div>
 
-      {/* ── Mobile day navigator ── */}
-      {isMobile && view === "calendar" && days.length > 1 && (
-        <div className="flex items-center justify-between gap-3 bg-gray-50 rounded-xl px-4 py-2.5 border border-[var(--color-border)]">
-          <button
-            onClick={() => setSelectedDayIdx((i) => Math.max(0, i - 1))}
-            disabled={selectedDayIdx === 0}
-            className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-500 hover:bg-gray-200 disabled:opacity-30 transition-colors text-lg"
-          >
-            ‹
-          </button>
-          <div className="text-center flex-1">
-            <div className="text-xs font-bold text-[var(--color-brand-600)] uppercase tracking-wider">
-              Day {days[selectedDayIdx]?.day_number}
-            </div>
-            <div className="text-sm font-medium text-gray-700">
-              {new Date(days[selectedDayIdx]?.date + "T00:00:00").toLocaleDateString("en-US", {
-                weekday: "long",
-                month: "short",
-                day: "numeric",
-              })}
-            </div>
-          </div>
-          <button
-            onClick={() => setSelectedDayIdx((i) => Math.min(days.length - 1, i + 1))}
-            disabled={selectedDayIdx === days.length - 1}
-            className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-500 hover:bg-gray-200 disabled:opacity-30 transition-colors text-lg"
-          >
-            ›
-          </button>
-        </div>
-      )}
-
       {/* Activity editor modal */}
       {editorState && (
         <ActivityEditorModal
@@ -1186,7 +1175,8 @@ export function TripCalendarView({
       {/* View content */}
       {view === "calendar" ? (
         <CalendarGrid
-          days={visibleDays}
+          days={days}
+          colWidth={colWidth}
           onCellClick={openAddEditor}
           onActivityEdit={openEditEditor}
           onUpdateDayField={handleUpdateDayField}
