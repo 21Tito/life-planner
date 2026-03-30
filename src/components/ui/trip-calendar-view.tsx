@@ -671,7 +671,7 @@ function CalendarGrid({
   return (
     <div
       className="overflow-auto rounded-xl border border-[var(--color-border)] bg-white"
-      style={{ maxHeight: "78vh" }}
+      style={{ maxHeight: "78vh", maxWidth: "100%" }}
     >
       <div
         className="flex flex-col"
@@ -926,6 +926,16 @@ export function TripCalendarView({
   const [view, setView] = useState<"calendar" | "list">("calendar");
   const [editorState, setEditorState] = useState<EditorState | null>(null);
   const [saving, setSaving] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const [selectedDayIdx, setSelectedDayIdx] = useState(0);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 639px)");
+    setIsMobile(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
 
   function openAddEditor(dayId: string, dayDate: string, hour: number) {
     setEditorState({
@@ -1084,12 +1094,14 @@ export function TripCalendarView({
     await supabase.from("trip_days").update({ [field]: updateValue }).eq("id", dayId);
   }
 
+  const visibleDays = isMobile ? [days[selectedDayIdx] ?? days[0]] : days;
+
   return (
     <div className="flex flex-col gap-4">
       {/* ── Toolbar ── */}
       <div className="flex items-center justify-between flex-wrap gap-3">
-        {/* Legend */}
-        <div className="flex flex-wrap gap-x-4 gap-y-1.5">
+        {/* Legend — hidden on mobile to save space */}
+        <div className="hidden sm:flex flex-wrap gap-x-4 gap-y-1.5">
           {CATEGORY_ORDER.map((cat) => {
             const config = CATEGORY_CONFIG[cat];
             return (
@@ -1104,7 +1116,7 @@ export function TripCalendarView({
         </div>
 
         {/* View toggle */}
-        <div className="flex items-center rounded-lg border border-[var(--color-border)] overflow-hidden text-sm">
+        <div className="flex items-center rounded-lg border border-[var(--color-border)] overflow-hidden text-sm ml-auto">
           <button
             onClick={() => setView("calendar")}
             className={`px-3 py-1.5 transition-colors ${
@@ -1128,6 +1140,38 @@ export function TripCalendarView({
         </div>
       </div>
 
+      {/* ── Mobile day navigator ── */}
+      {isMobile && view === "calendar" && days.length > 1 && (
+        <div className="flex items-center justify-between gap-3 bg-gray-50 rounded-xl px-4 py-2.5 border border-[var(--color-border)]">
+          <button
+            onClick={() => setSelectedDayIdx((i) => Math.max(0, i - 1))}
+            disabled={selectedDayIdx === 0}
+            className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-500 hover:bg-gray-200 disabled:opacity-30 transition-colors text-lg"
+          >
+            ‹
+          </button>
+          <div className="text-center flex-1">
+            <div className="text-xs font-bold text-[var(--color-brand-600)] uppercase tracking-wider">
+              Day {days[selectedDayIdx]?.day_number}
+            </div>
+            <div className="text-sm font-medium text-gray-700">
+              {new Date(days[selectedDayIdx]?.date + "T00:00:00").toLocaleDateString("en-US", {
+                weekday: "long",
+                month: "short",
+                day: "numeric",
+              })}
+            </div>
+          </div>
+          <button
+            onClick={() => setSelectedDayIdx((i) => Math.min(days.length - 1, i + 1))}
+            disabled={selectedDayIdx === days.length - 1}
+            className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-500 hover:bg-gray-200 disabled:opacity-30 transition-colors text-lg"
+          >
+            ›
+          </button>
+        </div>
+      )}
+
       {/* Activity editor modal */}
       {editorState && (
         <ActivityEditorModal
@@ -1142,7 +1186,7 @@ export function TripCalendarView({
       {/* View content */}
       {view === "calendar" ? (
         <CalendarGrid
-          days={days}
+          days={visibleDays}
           onCellClick={openAddEditor}
           onActivityEdit={openEditEditor}
           onUpdateDayField={handleUpdateDayField}
