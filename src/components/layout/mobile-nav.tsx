@@ -5,10 +5,9 @@ import { usePathname } from "next/navigation";
 import { Icons } from "@/components/ui/icons";
 
 const navItems = [
-  { href: "/dashboard", label: "Home",     icon: Icons.dashboard },
-  { href: "/meals",     label: "Meals",    icon: Icons.clipboard },
-  { href: "/trips",     label: "Trips",    icon: Icons.map },
-  { href: "/settings",  label: "Settings", icon: Icons.settings },
+  { href: "/dashboard", label: "Home",  icon: Icons.dashboard },
+  { href: "/meals",     label: "Meals", icon: Icons.clipboard },
+  { href: "/trips",     label: "Trips", icon: Icons.map },
 ];
 
 export function MobileNav() {

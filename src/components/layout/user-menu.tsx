@@ -122,6 +122,13 @@ export function UserMenu({ user, size = "default", dropdownPosition = "bottom-ri
               <span className="text-muted-foreground">{Icons.people}</span>
               Edit profile
             </button>
+            <button
+              onClick={() => { router.push("/settings"); setDropdownOpen(false); }}
+              className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm hover:bg-muted transition-colors text-left"
+            >
+              <span className="text-muted-foreground">{Icons.settings}</span>
+              Settings
+            </button>
             <div className="h-px bg-border mx-2 my-1" />
             <button
               onClick={handleSignOut}
