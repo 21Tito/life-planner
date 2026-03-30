@@ -218,9 +218,9 @@ function ActivityEditorModal({
       style={{ backgroundColor: "rgba(0,0,0,0.45)" }}
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="bg-white sm:rounded-2xl rounded-t-2xl shadow-2xl w-full sm:max-w-md overflow-hidden">
+      <div className="bg-white sm:rounded-2xl rounded-t-2xl shadow-2xl w-full sm:max-w-md flex flex-col max-h-[92vh] sm:max-h-[85vh]">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
           <div>
             <h2 className="font-semibold text-base">
               {isEditing ? "Edit Activity" : "Add Activity"}
@@ -237,7 +237,7 @@ function ActivityEditorModal({
           </button>
         </div>
 
-        <div className="px-5 py-4 space-y-4 max-h-[80vh] overflow-y-auto">
+        <div className="px-5 py-4 space-y-4 overflow-y-auto flex-1">
           {/* Category selector */}
           <div>
             <label className="block text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wider mb-2">
@@ -377,7 +377,7 @@ function ActivityEditorModal({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between px-5 py-4 border-t border-gray-100 gap-3">
+        <div className="flex items-center justify-between px-5 py-4 border-t border-gray-100 gap-3 flex-shrink-0">
           {/* Delete (only in edit mode) */}
           {isEditing ? (
             <button
