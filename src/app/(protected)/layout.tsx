@@ -41,7 +41,7 @@ export default async function ProtectedLayout({
           }}
         />
         {/* pt-14 clears mobile top header; pb-24 clears mobile bottom nav */}
-        <main className="flex-1 px-4 pt-20 pb-24 lg:px-10 lg:py-8 lg:pt-8 lg:pb-8">
+        <main className="flex-1 min-w-0 px-4 pt-20 pb-24 lg:px-10 lg:py-8 lg:pt-8 lg:pb-8">
           {children}
         </main>
         <MobileNav />

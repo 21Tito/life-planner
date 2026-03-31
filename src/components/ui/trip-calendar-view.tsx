@@ -607,7 +607,7 @@ function InlineEditCell({
   ) : (
     <div
       onClick={() => setEditing(true)}
-      className="px-3 py-1.5 text-sm cursor-text hover:bg-black/[0.03] min-h-[34px] flex items-center group"
+      className="px-3 py-1.5 text-sm cursor-text hover:bg-black/[0.03] min-h-[34px] flex items-center group overflow-hidden"
     >
       {displayName ? (
         displayUrl ? (
@@ -694,10 +694,10 @@ function CalendarGrid({
 
   return (
     <div
-      className="overflow-y-auto rounded-xl border border-[var(--color-border)] bg-white w-full min-w-0"
+      className="overflow-x-hidden overflow-y-auto rounded-xl border border-[var(--color-border)] bg-white w-full min-w-0"
       style={{ maxHeight: "78vh" }}
     >
-      <div className="flex flex-col w-full">
+      <div className="flex flex-col w-full min-w-0 overflow-hidden">
         {/* ══ STICKY HEADER GROUP (sticks to top while scrolling down) ══ */}
         <div className="sticky top-0 z-20 flex flex-col">
 
@@ -815,7 +815,7 @@ function CalendarGrid({
           </div>
 
           {/* Day columns (time grids) */}
-          <div className="flex flex-1">
+          <div className="flex flex-1 min-w-0">
             {days.map((day) => {
               const activities = day.trip_activities ?? [];
               const unscheduled = activities.filter((a) => {

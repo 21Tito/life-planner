@@ -135,6 +135,13 @@ export function TripsClient({ initialTrips }: Props) {
     reader.readAsText(file);
   }
 
+  async function handleDelete(tripId: string) {
+    const { error } = await supabase.from("trips").delete().eq("id", tripId);
+    if (!error) {
+      setTrips((prev) => prev.filter((t) => t.id !== tripId));
+    }
+  }
+
   function formatDate(dateStr: string) {
     return new Date(dateStr + "T00:00:00").toLocaleDateString("en-US", {
       month: "short",
@@ -470,29 +477,50 @@ export function TripsClient({ initialTrips }: Props) {
       ) : (
         <div className="space-y-3">
           {trips.map((trip) => (
-            <Link key={trip.id} href={`/trips/${trip.id}`}>
-              <Card className="hover:ring-primary/30 hover:shadow-md transition-all cursor-pointer">
-                <CardContent className="py-4 px-5">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-start gap-3 min-w-0">
-                      <div className="w-9 h-9 rounded-lg bg-secondary flex items-center justify-center text-primary/70 flex-shrink-0 mt-0.5">
-                        {Icons.map}
+            <div key={trip.id} className="relative group">
+              <Link href={`/trips/${trip.id}`}>
+                <Card className="hover:ring-primary/30 hover:shadow-md transition-all cursor-pointer">
+                  <CardContent className="py-4 px-5">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start gap-3 min-w-0">
+                        <div className="w-9 h-9 rounded-lg bg-secondary flex items-center justify-center text-primary/70 flex-shrink-0 mt-0.5">
+                          {Icons.map}
+                        </div>
+                        <div className="min-w-0">
+                          <h3 className="font-semibold truncate">{trip.title}</h3>
+                          <p className="text-xs lg:text-sm text-muted-foreground mt-0.5 truncate">
+                            {trip.destination} · {formatDate(trip.start_date)} –{" "}
+                            {formatDate(trip.end_date)}
+                          </p>
+                        </div>
                       </div>
-                      <div className="min-w-0">
-                        <h3 className="font-semibold truncate">{trip.title}</h3>
-                        <p className="text-xs lg:text-sm text-muted-foreground mt-0.5 truncate">
-                          {trip.destination} · {formatDate(trip.start_date)} –{" "}
-                          {formatDate(trip.end_date)}
-                        </p>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <Badge variant="secondary">
+                          {tripDuration(trip.start_date, trip.end_date)}
+                        </Badge>
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            if (confirm(`Delete "${trip.title}"? This cannot be undone.`)) {
+                              handleDelete(trip.id);
+                            }
+                          }}
+                          className="w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-red-600 hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100"
+                          title="Delete trip"
+                        >
+                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M3 6h18" />
+                            <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                            <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+                          </svg>
+                        </button>
                       </div>
                     </div>
-                    <Badge variant="secondary">
-                      {tripDuration(trip.start_date, trip.end_date)}
-                    </Badge>
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
+                  </CardContent>
+                </Card>
+              </Link>
+            </div>
           ))}
         </div>
       )}
