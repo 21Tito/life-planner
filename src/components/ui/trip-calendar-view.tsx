@@ -118,6 +118,7 @@ type ActivityFormData = {
   location: string;
   description: string;
   cost: string;
+  link: string;
 };
 
 type EditorState = {
@@ -182,6 +183,7 @@ function makeDefaultForm(hour: number): ActivityFormData {
     location: "",
     description: "",
     cost: "",
+    link: "",
   };
 }
 
@@ -332,6 +334,21 @@ function ActivityEditorModal({
               placeholder="Where is this?"
               value={form.location}
               onChange={(e) => setForm({ ...form, location: e.target.value })}
+              className="w-full h-10 px-3 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-600)]/30 focus:border-[var(--color-brand-600)]"
+            />
+          </div>
+
+          {/* Link */}
+          <div>
+            <label className="block text-sm font-medium mb-1.5">
+              Link{" "}
+              <span className="text-gray-400 font-normal">(optional)</span>
+            </label>
+            <input
+              type="url"
+              placeholder="Google Maps link, booking URL, etc."
+              value={form.link}
+              onChange={(e) => setForm({ ...form, link: e.target.value })}
               className="w-full h-10 px-3 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-600)]/30 focus:border-[var(--color-brand-600)]"
             />
           </div>
@@ -911,6 +928,7 @@ function CalendarGrid({
                       return (
                         <button
                           key={activity.id}
+                          onMouseDown={(e) => e.stopPropagation()}
                           onClick={(e) => {
                             e.stopPropagation();
                             onActivityEdit?.(activity, day.id);
@@ -918,12 +936,17 @@ function CalendarGrid({
                           className={`absolute inset-x-1 rounded-lg border text-left overflow-hidden transition-all group hover:shadow-md hover:z-10 z-0 ${config.bg} ${config.border} ${config.text}`}
                           style={{ top: pos.top + 2, height: pos.height }}
                         >
-                          <div className="p-1.5 h-full flex flex-col">
-                            <span className="text-[11px] font-semibold leading-tight line-clamp-2 flex-1">
+                          <div className="p-1.5 h-full flex flex-col overflow-hidden">
+                            <span className="text-[11px] font-semibold leading-tight line-clamp-2">
                               {activity.title}
                             </span>
+                            {activity.description && pos.height >= 48 && (
+                              <span className="text-[9px] leading-snug opacity-70 mt-0.5 line-clamp-2">
+                                {activity.description}
+                              </span>
+                            )}
                             {pos.height >= 52 && activity.start_time && (
-                              <span className="text-[9px] opacity-60 mt-1 shrink-0">
+                              <span className="text-[9px] opacity-60 mt-auto shrink-0">
                                 {formatDisplayTime(activity.start_time)}
                                 {activity.end_time &&
                                   ` – ${formatDisplayTime(activity.end_time)}`}
@@ -964,6 +987,10 @@ export function TripCalendarView({
   const [saving, setSaving] = useState(false);
   const [page, setPage] = useState(0);
   const MOBILE_PAGE_SIZE = 5;
+  const [tappedActivity, setTappedActivity] = useState<{
+    activity: TripActivity;
+    dayId: string;
+  } | null>(null);
 
   function openAddEditor(dayId: string, dayDate: string, startHour: number, endHour: number) {
     setEditorState({
@@ -978,8 +1005,18 @@ export function TripCalendarView({
         location: "",
         description: "",
         cost: "",
+        link: "",
       },
     });
+  }
+
+  function handleActivityTap(activity: TripActivity, dayId: string) {
+    // If no link, go straight to edit
+    if (!activity.booking_url) {
+      openEditEditor(activity, dayId);
+      return;
+    }
+    setTappedActivity({ activity, dayId });
   }
 
   function openEditEditor(activity: TripActivity, dayId: string) {
@@ -1002,6 +1039,7 @@ export function TripCalendarView({
         cost: activity.cost_cents
           ? String(activity.cost_cents / 100)
           : "",
+        link: activity.booking_url ?? "",
       },
     });
   }
@@ -1023,6 +1061,7 @@ export function TripCalendarView({
           cost_cents: form.cost
             ? Math.round(parseFloat(form.cost) * 100)
             : null,
+          booking_url: form.link.trim() || null,
         };
         const { error } = await supabase
           .from("trip_activities")
@@ -1060,6 +1099,7 @@ export function TripCalendarView({
           cost_cents: form.cost
             ? Math.round(parseFloat(form.cost) * 100)
             : null,
+          booking_url: form.link.trim() || null,
           sort_order: days.find((d) => d.id === editorState.dayId)?.trip_activities.length ?? 0,
         };
         const { data, error } = await supabase
@@ -1188,6 +1228,77 @@ export function TripCalendarView({
         />
       )}
 
+      {/* Quick action sheet when tapping an activity with a link */}
+      {tappedActivity && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4"
+          style={{ backgroundColor: "rgba(0,0,0,0.4)" }}
+          onClick={() => setTappedActivity(null)}
+        >
+          <div
+            className="bg-white sm:rounded-2xl rounded-t-2xl shadow-2xl w-full sm:max-w-xs overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-5 pt-4 pb-2">
+              <h3 className="font-semibold text-sm truncate">
+                {tappedActivity.activity.title}
+              </h3>
+              {tappedActivity.activity.start_time && (
+                <p className="text-xs text-[var(--color-text-muted)] mt-0.5">
+                  {formatDisplayTime(tappedActivity.activity.start_time)}
+                  {tappedActivity.activity.end_time &&
+                    ` – ${formatDisplayTime(tappedActivity.activity.end_time)}`}
+                </p>
+              )}
+            </div>
+            <div className="px-3 pb-3 space-y-1">
+              <button
+                onClick={() => {
+                  window.open(tappedActivity.activity.booking_url!, "_blank");
+                  setTappedActivity(null);
+                }}
+                className="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-gray-50 transition-colors text-left"
+              >
+                <div className="w-9 h-9 rounded-lg bg-blue-50 flex items-center justify-center flex-shrink-0">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-600">
+                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                    <polyline points="15 3 21 3 21 9" />
+                    <line x1="10" y1="14" x2="21" y2="3" />
+                  </svg>
+                </div>
+                <div>
+                  <span className="text-sm font-medium">Open Link</span>
+                  <p className="text-[11px] text-[var(--color-text-muted)] truncate max-w-[200px]">
+                    {tappedActivity.activity.booking_url}
+                  </p>
+                </div>
+              </button>
+              <button
+                onClick={() => {
+                  const { activity, dayId } = tappedActivity;
+                  setTappedActivity(null);
+                  openEditEditor(activity, dayId);
+                }}
+                className="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-gray-50 transition-colors text-left"
+              >
+                <div className="w-9 h-9 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-600">
+                    <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                  </svg>
+                </div>
+                <span className="text-sm font-medium">Edit Activity</span>
+              </button>
+            </div>
+            <button
+              onClick={() => setTappedActivity(null)}
+              className="w-full py-3 text-sm text-[var(--color-text-muted)] border-t border-gray-100 hover:bg-gray-50 transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Pagination controls */}
       {view === "calendar" && totalPages > 1 && (
         <div className="flex items-center justify-between gap-3 bg-gray-50 rounded-xl px-4 py-2 border border-[var(--color-border)]">
@@ -1216,7 +1327,7 @@ export function TripCalendarView({
         <CalendarGrid
           days={pagedDays}
           onCellClick={openAddEditor}
-          onActivityEdit={openEditEditor}
+          onActivityEdit={handleActivityTap}
           onUpdateDayField={handleUpdateDayField}
         />
       ) : (

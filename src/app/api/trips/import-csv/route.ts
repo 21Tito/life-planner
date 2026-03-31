@@ -6,27 +6,40 @@ import type { ActivityCategory } from "@/types";
 // Map CSV legend keywords to our activity categories
 function guessCategory(text: string): ActivityCategory {
   const lower = text.toLowerCase();
+
+  // Transport — check first since "arrive" and "depart" are strong signals
   if (
     lower.includes("flight") ||
     lower.includes("fly") ||
     lower.includes("airport") ||
     lower.includes("depart") ||
-    lower.includes("arrive lis") ||
+    lower.includes("arrive") ||
     lower.includes("train") ||
     lower.includes("rental car") ||
-    lower.includes("drive to")
+    lower.includes("pick up") ||
+    lower.includes("drive to") ||
+    lower.includes("drive back") ||
+    lower.includes("transit") ||
+    lower.includes("transfer") ||
+    lower.includes("taxi") ||
+    lower.includes("uber")
   )
     return "transport";
+
+  // Hotel / accommodation
   if (
     lower.includes("hotel") ||
     lower.includes("check in") ||
     lower.includes("check-in") ||
     lower.includes("checkout") ||
     lower.includes("check out") ||
-    lower.includes("intercontinental") ||
-    lower.includes("airbnb")
+    lower.includes("airbnb") ||
+    lower.includes("hostel") ||
+    lower.includes("accommodation")
   )
     return "hotel";
+
+  // Food — check before activity since restaurant names can contain activity words
   if (
     lower.includes("restaurant") ||
     lower.includes("dinner") ||
@@ -36,41 +49,143 @@ function guessCategory(text: string): ActivityCategory {
     lower.includes("food") ||
     lower.includes("café") ||
     lower.includes("cafe") ||
+    lower.includes("coffee") ||
     lower.includes("taberna") ||
     lower.includes("cervejaria") ||
     lower.includes("pastéis") ||
     lower.includes("pastel") ||
     lower.includes("francesinha") ||
     lower.includes("market") ||
-    lower.includes("time out market") ||
-    lower.includes("eat ")
+    lower.includes("eat ") ||
+    lower.includes("seafood") ||
+    lower.includes("tapas") ||
+    lower.includes("stall") ||
+    lower.includes("bakery") ||
+    lower.includes("reservation") ||
+    lower.includes("reserved")
   )
     return "restaurant";
+
+  // Shopping
   if (
     lower.includes("shopping") ||
     lower.includes("souvenir") ||
     lower.includes("bookshop") ||
-    lower.includes("livraria")
+    lower.includes("livraria") ||
+    lower.includes("shop") ||
+    lower.includes("boutique")
   )
     return "shopping";
+
+  // Rest
   if (
     lower.includes("spa") ||
     lower.includes("relax") ||
     lower.includes("swim") ||
     lower.includes("pool") ||
+    lower.includes("beach walk") ||
     lower.includes("rest")
   )
     return "rest";
+
+  // Nightlife / entertainment — still categorized as "activity"
   if (
     lower.includes("bar") ||
     lower.includes("fado") ||
     lower.includes("drinks") ||
-    lower.includes("sunset") ||
+    lower.includes("rooftop") ||
     lower.includes("night walk") ||
-    lower.includes("red frog")
+    lower.includes("nightlife")
   )
     return "activity";
+
+  // Sightseeing / default activity
   return "activity";
+}
+
+// Extract structured activity data from a cell's text
+function parseActivityCell(cell: string): {
+  title: string;
+  description: string | null;
+  location: string | null;
+  booking_url: string | null;
+} {
+  const lines = cell.split("\n").map((l) => l.trim()).filter(Boolean);
+  if (lines.length === 0) return { title: cell.trim(), description: null, location: null, booking_url: null };
+
+  let title = lines[0];
+  const descLines: string[] = [];
+  let location: string | null = null;
+  let booking_url: string | null = null;
+
+  // Check ALL lines (including the title) for URLs
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const urlMatch = line.match(/(https?:\/\/[^\s),"]+)/);
+    if (urlMatch && !booking_url) {
+      booking_url = urlMatch[1];
+      if (i === 0) {
+        // URL is in the title line — strip it out so the title stays clean
+        title = title.replace(urlMatch[0], "").replace(/\s{2,}/g, " ").trim();
+      }
+    }
+    if (i > 0) descLines.push(line);
+  }
+
+  // If the entire title IS a URL (the cell was just a link), use the domain as title
+  if (!title && booking_url) {
+    try {
+      title = new URL(booking_url).hostname.replace("www.", "");
+    } catch {
+      title = booking_url;
+    }
+  }
+
+  // Clean up title: strip leading emoji/bullet markers like "📍 " or "🔸 "
+  title = title.replace(/^[\u{1F300}-\u{1FFFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]\s*/u, "").trim();
+
+  // If title starts with a category prefix like "Restaurant - ", "Dinner: ", "Lunch: ", extract as location hint
+  const prefixMatch = title.match(
+    /^(Restaurant|Dinner|Lunch|Breakfast|Brunch|Coffee|Check in|Check out|Sunset|Morning)\s*[-:–]\s*/i
+  );
+  if (prefixMatch) {
+    // Keep the prefix context in the title but set the rest as location
+    const afterPrefix = title.slice(prefixMatch[0].length).trim();
+    if (afterPrefix) {
+      location = afterPrefix.split(/\s*[-–(]\s*/)[0].trim();
+    }
+  } else {
+    // Try to extract a location/place name from the title
+    // Many entries are just place names which serve as both title and location
+    location = title.split(/\s*[-–]\s*/)[0].trim();
+    // Don't set location if it's the same as the full title (not useful)
+    if (location === title) location = null;
+  }
+
+  return {
+    title,
+    description: descLines.length > 0 ? descLines.join("\n") : null,
+    location,
+    booking_url,
+  };
+}
+
+// Try to extract a specific time from cell text for overflow rows
+// Matches patterns like "7PM", "6:30PM", "at 9:30AM", "RESERVED 7PM", "@ 9:30AM"
+function extractTimeFromText(text: string): { start: string; end: string } | null {
+  const match = text.match(
+    /(?:at |@ |RESERVED?\s*|RESERVATION\s*)(\d{1,2})(?::(\d{2}))?\s*(AM|PM)/i
+  );
+  if (!match) return null;
+  let hour = parseInt(match[1]);
+  const minutes = match[2] ? parseInt(match[2]) : 0;
+  const ampm = match[3].toUpperCase();
+  if (ampm === "PM" && hour < 12) hour += 12;
+  if (ampm === "AM" && hour === 12) hour = 0;
+  const start = `${String(hour).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+  const endHour = hour + 1;
+  const end = `${String(endHour).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+  return { start, end };
 }
 
 // Parse a CSV line respecting quoted fields
@@ -297,21 +412,19 @@ export async function POST(request: Request) {
         }
 
         const dayId = colToDayId[colIdx];
-        const lines = cell.split("\n").map((l: string) => l.trim()).filter(Boolean);
-        const actTitle = lines[0];
-        const description = lines.length > 1 ? lines.slice(1).join("\n") : null;
+        const parsed = parseActivityCell(cell);
 
         activitiesToInsert.push({
           trip_day_id: dayId,
           user_id: ownerId,
-          title: actTitle,
-          description,
+          title: parsed.title,
+          description: parsed.description,
           category: guessCategory(cell),
           start_time: startTime,
           end_time: endTime,
-          location: null,
+          location: parsed.location,
           cost_cents: null,
-          booking_url: null,
+          booking_url: parsed.booking_url,
           sort_order: sortOrders[dayId]++,
         });
       }
@@ -325,21 +438,20 @@ export async function POST(request: Request) {
         if (!cell) continue;
 
         const dayId = colToDayId[colIdx];
-        const lines = cell.split("\n").map((l: string) => l.trim()).filter(Boolean);
-        const actTitle = lines[0];
-        const description = lines.length > 1 ? lines.slice(1).join("\n") : null;
+        const parsed = parseActivityCell(cell);
+        const extractedTime = extractTimeFromText(cell);
 
         activitiesToInsert.push({
           trip_day_id: dayId,
           user_id: ownerId,
-          title: actTitle,
-          description,
+          title: parsed.title,
+          description: parsed.description,
           category: guessCategory(cell),
-          start_time: null,
-          end_time: null,
-          location: null,
+          start_time: extractedTime?.start ?? null,
+          end_time: extractedTime?.end ?? null,
+          location: parsed.location,
           cost_cents: null,
-          booking_url: null,
+          booking_url: parsed.booking_url,
           sort_order: sortOrders[dayId]++,
         });
       }
