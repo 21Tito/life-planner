@@ -16,7 +16,7 @@ interface Props {
   initialTrips: Trip[];
 }
 
-type CreationMode = "ai" | "manual";
+type CreationMode = "ai" | "manual" | "csv";
 
 export function TripsClient({ initialTrips }: Props) {
   const supabase = createClient();
@@ -33,6 +33,7 @@ export function TripsClient({ initialTrips }: Props) {
     budget: "",
     notes: "",
   });
+  const [csvText, setCsvText] = useState("");
 
   function resetForm() {
     setForm({
@@ -93,6 +94,45 @@ export function TripsClient({ initialTrips }: Props) {
       console.error("Manual trip creation failed:", err);
       setSubmitting(false);
     }
+  }
+
+  async function handleCSVImport() {
+    if (!csvText.trim()) return;
+    setSubmitting(true);
+
+    try {
+      const res = await fetch("/api/trips/import-csv", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          csv: csvText,
+          title: form.destination ? `${form.destination} Trip` : undefined,
+          destination: form.destination || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (data.error) {
+        console.error("Import failed:", data.error);
+        return;
+      }
+      if (data.trip) {
+        router.push(`/trips/${data.trip.id}`);
+      }
+    } catch (err) {
+      console.error("CSV import failed:", err);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      setCsvText(ev.target?.result as string);
+    };
+    reader.readAsText(file);
   }
 
   function formatDate(dateStr: string) {
@@ -175,7 +215,6 @@ export function TripsClient({ initialTrips }: Props) {
                     : "text-[var(--color-text-muted)] hover:bg-gray-50"
                 }`}
               >
-                {/* pencil icon */}
                 <svg
                   width="14"
                   height="14"
@@ -190,102 +229,166 @@ export function TripsClient({ initialTrips }: Props) {
                 </svg>
                 Build Manually
               </button>
+              <button
+                onClick={() => setMode("csv")}
+                className={`px-4 py-2 flex items-center gap-1.5 transition-colors border-l border-[var(--color-border)] ${
+                  mode === "csv"
+                    ? "bg-[var(--color-brand-600)] text-white font-medium"
+                    : "text-[var(--color-text-muted)] hover:bg-gray-50"
+                }`}
+              >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" />
+                  <path d="M14 2v6h6" />
+                  <path d="M12 18v-6" />
+                  <path d="M9 15h6" />
+                </svg>
+                Import CSV
+              </button>
             </div>
 
-            <div className="grid gap-3 lg:gap-4 grid-cols-1 sm:grid-cols-2">
-              <div className="sm:col-span-2">
-                <label className="block text-sm font-medium mb-1.5">
-                  Destination
-                </label>
-                <Input
-                  placeholder="e.g. Lisbon, Portugal"
-                  value={form.destination}
-                  onChange={(e) =>
-                    setForm({ ...form, destination: e.target.value })
-                  }
-                  className="h-10 text-sm"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1.5">
-                  Start Date
-                </label>
-                <Input
-                  type="date"
-                  value={form.start_date}
-                  onChange={(e) =>
-                    setForm({ ...form, start_date: e.target.value })
-                  }
-                  className="h-10 text-sm"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1.5">
-                  End Date
-                </label>
-                <Input
-                  type="date"
-                  value={form.end_date}
-                  onChange={(e) =>
-                    setForm({ ...form, end_date: e.target.value })
-                  }
-                  className="h-10 text-sm"
-                />
-              </div>
-
-              {/* AI-only fields */}
-              {mode === "ai" && (
-                <div className="sm:col-span-2">
+            {mode === "csv" ? (
+              <div className="space-y-4">
+                <div>
                   <label className="block text-sm font-medium mb-1.5">
-                    Interests{" "}
+                    Destination{" "}
                     <span className="text-muted-foreground font-normal">
                       (optional)
                     </span>
                   </label>
                   <Input
-                    placeholder="e.g. food, history, street art, beaches"
-                    value={form.interests}
+                    placeholder="e.g. Portugal"
+                    value={form.destination}
                     onChange={(e) =>
-                      setForm({ ...form, interests: e.target.value })
+                      setForm({ ...form, destination: e.target.value })
                     }
                     className="h-10 text-sm"
                   />
                 </div>
-              )}
+                <div>
+                  <label className="block text-sm font-medium mb-1.5">
+                    Upload CSV file
+                  </label>
+                  <Input
+                    type="file"
+                    accept=".csv"
+                    onChange={handleFileUpload}
+                    className="h-10 text-sm file:mr-3 file:px-3 file:py-1 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-secondary file:text-secondary-foreground hover:file:bg-secondary/80"
+                  />
+                </div>
+                {csvText && (
+                  <p className="text-xs text-green-600 flex items-center gap-1.5">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M20 6 9 17l-5-5" />
+                    </svg>
+                    CSV loaded ({csvText.split("\n").length} rows)
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div className="grid gap-3 lg:gap-4 grid-cols-1 sm:grid-cols-2">
+                <div className="sm:col-span-2">
+                  <label className="block text-sm font-medium mb-1.5">
+                    Destination
+                  </label>
+                  <Input
+                    placeholder="e.g. Lisbon, Portugal"
+                    value={form.destination}
+                    onChange={(e) =>
+                      setForm({ ...form, destination: e.target.value })
+                    }
+                    className="h-10 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1.5">
+                    Start Date
+                  </label>
+                  <Input
+                    type="date"
+                    value={form.start_date}
+                    onChange={(e) =>
+                      setForm({ ...form, start_date: e.target.value })
+                    }
+                    className="h-10 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1.5">
+                    End Date
+                  </label>
+                  <Input
+                    type="date"
+                    value={form.end_date}
+                    onChange={(e) =>
+                      setForm({ ...form, end_date: e.target.value })
+                    }
+                    className="h-10 text-sm"
+                  />
+                </div>
 
-              <div>
-                <label className="block text-sm font-medium mb-1.5">
-                  Budget{" "}
-                  <span className="text-muted-foreground font-normal">
-                    (optional)
-                  </span>
-                </label>
-                <Input
-                  placeholder="e.g. $2000"
-                  value={form.budget}
-                  onChange={(e) =>
-                    setForm({ ...form, budget: e.target.value })
-                  }
-                  className="h-10 text-sm"
-                />
+                {mode === "ai" && (
+                  <div className="sm:col-span-2">
+                    <label className="block text-sm font-medium mb-1.5">
+                      Interests{" "}
+                      <span className="text-muted-foreground font-normal">
+                        (optional)
+                      </span>
+                    </label>
+                    <Input
+                      placeholder="e.g. food, history, street art, beaches"
+                      value={form.interests}
+                      onChange={(e) =>
+                        setForm({ ...form, interests: e.target.value })
+                      }
+                      className="h-10 text-sm"
+                    />
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-sm font-medium mb-1.5">
+                    Budget{" "}
+                    <span className="text-muted-foreground font-normal">
+                      (optional)
+                    </span>
+                  </label>
+                  <Input
+                    placeholder="e.g. $2000"
+                    value={form.budget}
+                    onChange={(e) =>
+                      setForm({ ...form, budget: e.target.value })
+                    }
+                    className="h-10 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1.5">
+                    Notes{" "}
+                    <span className="text-muted-foreground font-normal">
+                      (optional)
+                    </span>
+                  </label>
+                  <Input
+                    placeholder="e.g. traveling with partner"
+                    value={form.notes}
+                    onChange={(e) =>
+                      setForm({ ...form, notes: e.target.value })
+                    }
+                    className="h-10 text-sm"
+                  />
+                </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium mb-1.5">
-                  Notes{" "}
-                  <span className="text-muted-foreground font-normal">
-                    (optional)
-                  </span>
-                </label>
-                <Input
-                  placeholder="e.g. traveling with partner"
-                  value={form.notes}
-                  onChange={(e) =>
-                    setForm({ ...form, notes: e.target.value })
-                  }
-                  className="h-10 text-sm"
-                />
-              </div>
-            </div>
+            )}
 
             <div className="mt-5 lg:mt-6">
               {mode === "ai" ? (
@@ -296,6 +399,27 @@ export function TripsClient({ initialTrips }: Props) {
                 >
                   <span>{Icons.sparkle}</span>
                   {submitting ? "Generating itinerary..." : "Generate Itinerary"}
+                </Button>
+              ) : mode === "csv" ? (
+                <Button
+                  onClick={handleCSVImport}
+                  disabled={!csvText.trim() || submitting}
+                  className="w-full sm:w-auto rounded-full px-8 h-11 gap-2"
+                >
+                  <svg
+                    width="15"
+                    height="15"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" />
+                    <path d="M14 2v6h6" />
+                  </svg>
+                  {submitting ? "Importing..." : "Import & View Trip"}
                 </Button>
               ) : (
                 <Button
@@ -320,6 +444,12 @@ export function TripsClient({ initialTrips }: Props) {
               )}
             </div>
 
+            {mode === "csv" && (
+              <p className="text-xs text-[var(--color-text-muted)] mt-3">
+                Upload a CSV exported from Google Sheets. Dates, cities, hotels,
+                and timed activities will be imported automatically.
+              </p>
+            )}
             {mode === "manual" && (
               <p className="text-xs text-[var(--color-text-muted)] mt-3">
                 You&apos;ll be taken to an empty calendar where you can add activities

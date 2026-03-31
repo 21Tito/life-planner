@@ -29,7 +29,7 @@ export default async function TripDetailPage({
   const tripDays: (TripDay & { trip_activities: TripActivity[] })[] = days || [];
 
   return (
-    <div className="w-full">
+    <div className="w-full min-w-0 overflow-hidden">
       <Link
         href="/trips"
         className="text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)] mb-4 inline-block transition-colors"

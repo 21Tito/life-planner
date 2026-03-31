@@ -9,11 +9,14 @@ export async function getOwnerId(
   supabase: SupabaseClient,
   userId: string
 ): Promise<string> {
-  const { data } = await supabase
-    .from("household_members")
-    .select("owner_id")
-    .eq("member_id", userId)
-    .single();
-
-  return data?.owner_id ?? userId;
+  try {
+    const { data } = await supabase
+      .from("household_members")
+      .select("owner_id")
+      .eq("member_id", userId)
+      .maybeSingle();
+    return data?.owner_id ?? userId;
+  } catch {
+    return userId;
+  }
 }

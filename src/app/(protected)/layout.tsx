@@ -3,7 +3,6 @@ import { redirect } from "next/navigation";
 import { Sidebar } from "@/components/layout/sidebar";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { HouseholdProvider } from "@/lib/household-context";
-import { getOwnerId } from "@/lib/get-owner-id";
 
 export default async function ProtectedLayout({
   children,
@@ -19,10 +18,16 @@ export default async function ProtectedLayout({
     redirect("/login");
   }
 
-  const [{ data: profile }, ownerId] = await Promise.all([
-    supabase.from("profiles").select("*").eq("id", user.id).single(),
-    getOwnerId(supabase, user.id),
-  ]);
+  // household_owner_id is written into user_metadata when they accept an invite.
+  // No extra DB query needed — it's baked into the JWT.
+  const ownerId =
+    (user.user_metadata?.household_owner_id as string | undefined) ?? user.id;
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("id", user.id)
+    .single();
 
   return (
     <HouseholdProvider ownerId={ownerId}>
