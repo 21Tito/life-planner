@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 
 // POST { token } — accept an invite and join the owner's household
@@ -44,7 +45,7 @@ export async function POST(request: Request) {
       .from("household_members")
       .select("owner_id")
       .eq("member_id", user.id)
-      .single();
+      .maybeSingle();
 
     if (existing) {
       if (existing.owner_id === invite.owner_id) {
@@ -62,6 +63,16 @@ export async function POST(request: Request) {
     });
 
     if (error) throw error;
+
+    // Store owner_id in user metadata so the layout never needs to query DB.
+    // Uses service role to update auth metadata server-side.
+    const admin = createAdminClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+    await admin.auth.admin.updateUserById(user.id, {
+      user_metadata: { household_owner_id: invite.owner_id },
+    });
 
     return NextResponse.json({ ok: true });
   } catch (err) {

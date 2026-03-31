@@ -74,8 +74,6 @@ const CATEGORY_CONFIG: Record<
 const HOUR_HEIGHT = 80;
 const START_HOUR = 6;
 const END_HOUR = 23;
-const DAY_COL_WIDTH = 210;
-const DAY_COL_WIDTH_MOBILE = 72;
 const TIME_COL_WIDTH = 52;
 const TOTAL_HEIGHT = (END_HOUR - START_HOUR) * HOUR_HEIGHT;
 
@@ -638,17 +636,23 @@ function InlineEditCell({
 
 function CalendarGrid({
   days,
-  colWidth = DAY_COL_WIDTH,
   onCellClick,
   onActivityEdit,
   onUpdateDayField,
 }: {
   days: DayWithActivities[];
-  colWidth?: number;
-  onCellClick?: (dayId: string, dayDate: string, hour: number) => void;
+  onCellClick?: (dayId: string, dayDate: string, startHour: number, endHour: number) => void;
   onActivityEdit?: (activity: TripActivity, dayId: string) => void;
   onUpdateDayField?: (dayId: string, field: "title" | "notes", value: string) => void;
 }) {
+  // Drag-to-select state
+  const [dragState, setDragState] = useState<{
+    dayId: string;
+    dayDate: string;
+    startHour: number;
+    currentHour: number;
+  } | null>(null);
+
   const hasUnscheduled = days.some((d) =>
     d.trip_activities?.some((a) => {
       if (!a.start_time) return true;
@@ -657,29 +661,43 @@ function CalendarGrid({
     })
   );
 
-  function handleGridClick(
-    e: React.MouseEvent<HTMLDivElement>,
-    day: DayWithActivities
-  ) {
-    if (!onCellClick) return;
+  function getHourFromY(e: React.MouseEvent<HTMLDivElement>) {
     const rect = e.currentTarget.getBoundingClientRect();
     const y = e.clientY - rect.top;
-    const hour = Math.min(
+    return Math.min(
       Math.max(Math.floor(y / HOUR_HEIGHT) + START_HOUR, START_HOUR),
       END_HOUR - 1
     );
-    onCellClick(day.id, day.date, hour);
+  }
+
+  function handleMouseDown(e: React.MouseEvent<HTMLDivElement>, day: DayWithActivities) {
+    if (!onCellClick) return;
+    const hour = getHourFromY(e);
+    setDragState({ dayId: day.id, dayDate: day.date, startHour: hour, currentHour: hour });
+  }
+
+  function handleMouseMove(e: React.MouseEvent<HTMLDivElement>) {
+    if (!dragState) return;
+    const hour = getHourFromY(e);
+    if (hour !== dragState.currentHour) {
+      setDragState({ ...dragState, currentHour: hour });
+    }
+  }
+
+  function handleMouseUp() {
+    if (!dragState || !onCellClick) return;
+    const fromHour = Math.min(dragState.startHour, dragState.currentHour);
+    const toHour = Math.max(dragState.startHour, dragState.currentHour) + 1;
+    onCellClick(dragState.dayId, dragState.dayDate, fromHour, toHour);
+    setDragState(null);
   }
 
   return (
     <div
-      className="overflow-auto rounded-xl border border-[var(--color-border)] bg-white"
-      style={{ maxHeight: "78vh", maxWidth: "100%" }}
+      className="overflow-y-auto rounded-xl border border-[var(--color-border)] bg-white w-full min-w-0"
+      style={{ maxHeight: "78vh" }}
     >
-      <div
-        className="flex flex-col"
-        style={{ minWidth: `${TIME_COL_WIDTH + days.length * colWidth}px` }}
-      >
+      <div className="flex flex-col w-full">
         {/* ══ STICKY HEADER GROUP (sticks to top while scrolling down) ══ */}
         <div className="sticky top-0 z-20 flex flex-col">
 
@@ -691,38 +709,20 @@ function CalendarGrid({
             />
             {days.map((day) => {
               const d = new Date(day.date + "T00:00:00");
-              const isCompact = colWidth < 120;
               return (
                 <div
                   key={day.id}
-                  className="flex-shrink-0 border-r border-[var(--color-border)] last:border-r-0"
-                  style={{ width: colWidth }}
+                  className="flex-1 min-w-0 border-r border-[var(--color-border)] last:border-r-0"
                 >
-                  {isCompact ? (
-                    /* Google Calendar-style compact header */
-                    <div className="flex flex-col items-center justify-center py-2 gap-0.5">
-                      <span className="text-[9px] font-semibold uppercase tracking-widest text-[var(--color-text-muted)]">
-                        {d.toLocaleDateString("en-US", { weekday: "short" })}
-                      </span>
-                      <span className="text-base font-bold text-[var(--color-brand-600)] leading-none">
-                        {d.getDate()}
-                      </span>
-                    </div>
-                  ) : (
-                    /* Desktop full header */
-                    <div className="px-3 py-2">
-                      <div className="text-[10px] font-bold tracking-wider text-[var(--color-brand-600)] uppercase">
-                        Day {day.day_number}
-                      </div>
-                      <div className="text-[11px] text-[var(--color-text-muted)] mt-0.5">
-                        {d.toLocaleDateString("en-US", {
-                          weekday: "short",
-                          month: "short",
-                          day: "numeric",
-                        })}
-                      </div>
-                    </div>
-                  )}
+                  {/* Compact header that works at any width */}
+                  <div className="flex flex-col items-center justify-center py-2 gap-0.5">
+                    <span className="text-[9px] font-semibold uppercase tracking-widest text-[var(--color-text-muted)]">
+                      {d.toLocaleDateString("en-US", { weekday: "short" })}
+                    </span>
+                    <span className="text-base font-bold text-[var(--color-brand-600)] leading-none">
+                      {d.getDate()}
+                    </span>
+                  </div>
                 </div>
               );
             })}
@@ -741,8 +741,7 @@ function CalendarGrid({
             {days.map((day) => (
               <div
                 key={day.id}
-                className="flex-shrink-0 border-r border-[var(--color-border)] last:border-r-0"
-                style={{ width: colWidth }}
+                className="flex-1 min-w-0 border-r border-[var(--color-border)] last:border-r-0"
               >
                 <InlineEditCell
                   value={day.title}
@@ -766,8 +765,7 @@ function CalendarGrid({
             {days.map((day) => (
               <div
                 key={day.id}
-                className="flex-shrink-0 border-r border-[var(--color-border)] last:border-r-0"
-                style={{ width: colWidth }}
+                className="flex-1 min-w-0 border-r border-[var(--color-border)] last:border-r-0"
               >
                 <InlineEditCell
                   value={day.notes}
@@ -829,8 +827,7 @@ function CalendarGrid({
               return (
                 <div
                   key={day.id}
-                  className="flex-shrink-0 border-r border-[var(--color-border)] last:border-r-0"
-                  style={{ width: colWidth }}
+                  className="flex-1 min-w-0 border-r border-[var(--color-border)] last:border-r-0"
                 >
                   {/* Anytime row */}
                   {hasUnscheduled && (
@@ -854,7 +851,7 @@ function CalendarGrid({
                         );
                       })}
                       <button
-                        onClick={() => onCellClick?.(day.id, day.date, START_HOUR)}
+                        onClick={() => onCellClick?.(day.id, day.date, START_HOUR, START_HOUR + 1)}
                         className="text-[10px] text-gray-400 hover:text-gray-600 px-1"
                         title="Add activity"
                       >
@@ -865,9 +862,12 @@ function CalendarGrid({
 
                   {/* Time grid */}
                   <div
-                    className="relative cursor-pointer"
+                    className="relative cursor-pointer select-none"
                     style={{ height: TOTAL_HEIGHT }}
-                    onClick={(e) => handleGridClick(e, day)}
+                    onMouseDown={(e) => handleMouseDown(e, day)}
+                    onMouseMove={handleMouseMove}
+                    onMouseUp={handleMouseUp}
+                    onMouseLeave={() => dragState?.dayId === day.id && handleMouseUp()}
                   >
                     {/* Hour gridlines */}
                     {hours.map((hour) => (
@@ -885,6 +885,20 @@ function CalendarGrid({
                         style={{ top: (hour - START_HOUR) * HOUR_HEIGHT + HOUR_HEIGHT / 2 }}
                       />
                     ))}
+                    {/* Drag selection highlight */}
+                    {dragState?.dayId === day.id && (() => {
+                      const fromH = Math.min(dragState.startHour, dragState.currentHour);
+                      const toH = Math.max(dragState.startHour, dragState.currentHour) + 1;
+                      return (
+                        <div
+                          className="absolute inset-x-1 rounded-lg bg-blue-100/60 border-2 border-blue-300 pointer-events-none z-10"
+                          style={{
+                            top: (fromH - START_HOUR) * HOUR_HEIGHT,
+                            height: (toH - fromH) * HOUR_HEIGHT,
+                          }}
+                        />
+                      );
+                    })()}
                     {/* Hover overlay */}
                     <div className="absolute inset-0 hover:bg-blue-50/20 transition-colors pointer-events-none" />
 
@@ -948,22 +962,23 @@ export function TripCalendarView({
   const [view, setView] = useState<"calendar" | "list">("calendar");
   const [editorState, setEditorState] = useState<EditorState | null>(null);
   const [saving, setSaving] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
+  const [page, setPage] = useState(0);
+  const MOBILE_PAGE_SIZE = 5;
 
-  useEffect(() => {
-    const mq = window.matchMedia("(max-width: 639px)");
-    setIsMobile(mq.matches);
-    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
-    mq.addEventListener("change", handler);
-    return () => mq.removeEventListener("change", handler);
-  }, []);
-
-  function openAddEditor(dayId: string, dayDate: string, hour: number) {
+  function openAddEditor(dayId: string, dayDate: string, startHour: number, endHour: number) {
     setEditorState({
       dayId,
       dayDate,
       activity: null,
-      form: makeDefaultForm(hour),
+      form: {
+        title: "",
+        category: "activity",
+        start_time: `${String(startHour).padStart(2, "0")}:00`,
+        end_time: `${String(Math.min(endHour, END_HOUR)).padStart(2, "0")}:00`,
+        location: "",
+        description: "",
+        cost: "",
+      },
     });
   }
 
@@ -1115,10 +1130,11 @@ export function TripCalendarView({
     await supabase.from("trip_days").update({ [field]: updateValue }).eq("id", dayId);
   }
 
-  const colWidth = isMobile ? DAY_COL_WIDTH_MOBILE : DAY_COL_WIDTH;
+  const totalPages = Math.ceil(days.length / MOBILE_PAGE_SIZE);
+  const pagedDays = days.slice(page * MOBILE_PAGE_SIZE, (page + 1) * MOBILE_PAGE_SIZE);
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4 min-w-0 w-full">
       {/* ── Toolbar ── */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         {/* Legend — hidden on mobile to save space */}
@@ -1172,11 +1188,33 @@ export function TripCalendarView({
         />
       )}
 
+      {/* Pagination controls */}
+      {view === "calendar" && totalPages > 1 && (
+        <div className="flex items-center justify-between gap-3 bg-gray-50 rounded-xl px-4 py-2 border border-[var(--color-border)]">
+          <button
+            onClick={() => setPage((p) => Math.max(0, p - 1))}
+            disabled={page === 0}
+            className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-500 hover:bg-gray-200 disabled:opacity-30 transition-colors text-xl leading-none"
+          >
+            ‹
+          </button>
+          <span className="text-xs text-[var(--color-text-muted)]">
+            Days {page * MOBILE_PAGE_SIZE + 1}–{Math.min((page + 1) * MOBILE_PAGE_SIZE, days.length)} of {days.length}
+          </span>
+          <button
+            onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+            disabled={page === totalPages - 1}
+            className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-500 hover:bg-gray-200 disabled:opacity-30 transition-colors text-xl leading-none"
+          >
+            ›
+          </button>
+        </div>
+      )}
+
       {/* View content */}
       {view === "calendar" ? (
         <CalendarGrid
-          days={days}
-          colWidth={colWidth}
+          days={pagedDays}
           onCellClick={openAddEditor}
           onActivityEdit={openEditEditor}
           onUpdateDayField={handleUpdateDayField}
