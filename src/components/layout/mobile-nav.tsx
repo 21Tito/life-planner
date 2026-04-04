@@ -13,6 +13,9 @@ const navItems = [
 export function MobileNav() {
   const pathname = usePathname();
 
+  // Hide on trip detail pages — the back link is enough to navigate away
+  if (/^\/trips\/.+/.test(pathname)) return null;
+
   return (
     <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-[var(--color-border)] flex">
       {navItems.map((item) => {

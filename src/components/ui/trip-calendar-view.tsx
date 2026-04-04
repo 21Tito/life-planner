@@ -439,26 +439,6 @@ function ActivityEditorModal({
             />
           </div>
 
-          {/* Cost */}
-          <div>
-            <label className="block text-sm font-medium mb-1.5">
-              Estimated cost{" "}
-              <span className="text-gray-400 font-normal">(optional)</span>
-            </label>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">
-                $
-              </span>
-              <input
-                type="number"
-                placeholder="0"
-                min="0"
-                value={form.cost}
-                onChange={(e) => setForm({ ...form, cost: e.target.value })}
-                className="w-full h-10 pl-7 pr-3 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-600)]/30 focus:border-[var(--color-brand-600)]"
-              />
-            </div>
-          </div>
 
         </div>
 
@@ -812,14 +792,6 @@ function CalendarGrid({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [!!actDrag]);
 
-  const hasUnscheduled = days.some((d) =>
-    d.trip_activities?.some((a) => {
-      if (!a.start_time) return true;
-      const h = timeToMinutes(a.start_time) / 60;
-      return h < START_HOUR || h >= END_HOUR;
-    })
-  );
-
   function getHourFromY(e: React.MouseEvent<HTMLDivElement>) {
     const rect = e.currentTarget.getBoundingClientRect();
     const y = e.clientY - rect.top;
@@ -943,7 +915,7 @@ function CalendarGrid({
           </div>
 
           {/* Row 2: City */}
-          <div className="flex bg-white border-b border-[var(--color-border)]">
+          <div className="flex bg-white border-b border-[var(--color-border)]" style={{ height: 34 }}>
             <div
               className="sticky left-0 z-10 bg-white border-r border-[var(--color-border)] flex-shrink-0 flex items-center justify-end pr-2"
               style={{ width: TIME_COL_WIDTH }}
@@ -967,7 +939,7 @@ function CalendarGrid({
           </div>
 
           {/* Row 3: Hotel */}
-          <div className="flex border-b border-[var(--color-border)]" style={{ backgroundColor: "rgb(255 247 237 / 0.5)" }}>
+          <div className="flex border-b border-[var(--color-border)]" style={{ backgroundColor: "rgb(255 247 237 / 0.5)", height: 34 }}>
             <div
               className="sticky left-0 z-10 border-r border-[var(--color-border)] flex-shrink-0 flex items-center justify-end pr-2"
               style={{ width: TIME_COL_WIDTH, backgroundColor: "rgb(255 247 237 / 0.5)" }}
@@ -1001,18 +973,6 @@ function CalendarGrid({
             className="sticky left-0 z-10 bg-white border-r border-[var(--color-border)] flex-shrink-0"
             style={{ width: TIME_COL_WIDTH }}
           >
-            {hasUnscheduled && (
-              <div
-                className="bg-gray-50/60 border-b border-[var(--color-border)] flex items-center justify-center"
-                style={{ height: 44 }}
-              >
-                <span className="text-[9px] leading-tight text-center text-[var(--color-text-muted)] px-1">
-                  Any
-                  <br />
-                  time
-                </span>
-              </div>
-            )}
             <div className="relative" style={{ height: TOTAL_HEIGHT }}>
               {hours.map((hour) => (
                 <div
@@ -1032,47 +992,11 @@ function CalendarGrid({
           <div className="flex flex-1 min-w-0">
             {days.map((day) => {
               const activities = day.trip_activities ?? [];
-              const unscheduled = activities.filter((a) => {
-                if (!a.start_time) return true;
-                const h = timeToMinutes(a.start_time) / 60;
-                return h < START_HOUR || h >= END_HOUR;
-              });
-
               return (
                 <div
                   key={day.id}
                   className="flex-1 min-w-0 border-r border-[var(--color-border)] last:border-r-0"
                 >
-                  {/* Anytime row */}
-                  {hasUnscheduled && (
-                    <div
-                      className="bg-gray-50/40 border-b border-[var(--color-border)] p-1 flex flex-wrap gap-1 items-center overflow-hidden"
-                      style={{ height: 44 }}
-                    >
-                      {unscheduled.map((activity) => {
-                        const config = getCategoryConfig(activity.category);
-                        return (
-                          <button
-                            key={activity.id}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onActivityEdit?.(activity, day.id);
-                            }}
-                            className={`text-[10px] px-1.5 py-0.5 rounded-full border leading-tight truncate max-w-full ${config.bg} ${config.border} ${config.text}`}
-                          >
-                            {activity.title}
-                          </button>
-                        );
-                      })}
-                      <button
-                        onClick={() => onCellClick?.(day.id, day.date, START_HOUR, START_HOUR + 1)}
-                        className="text-[10px] text-gray-400 hover:text-gray-600 px-1"
-                        title="Add activity"
-                      >
-                        +
-                      </button>
-                    </div>
-                  )}
 
                   {/* Time grid */}
                   <div

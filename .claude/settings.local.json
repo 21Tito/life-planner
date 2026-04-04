@@ -19,7 +19,23 @@
       "Bash(npx tsc:*)",
       "Bash(npx shadcn@latest init --style new-york --base-color slate --yes)",
       "Bash(npx shadcn@latest init --help)",
-      "Bash(npx shadcn@latest init -y -d)"
+      "Bash(npx shadcn@latest init -y -d)",
+      "Bash(npx shadcn@latest add input card avatar tabs select textarea badge -y)",
+      "Bash(npx shadcn@latest add input card avatar tabs select textarea badge --overwrite -y)",
+      "Bash(npx shadcn@latest add input card avatar tabs select textarea --overwrite)",
+      "Bash(grep -r BadgeVariant node_modules/ --include=*.d.ts)",
+      "Bash(npx next:*)",
+      "Bash(npx kill-port:*)",
+      "Bash(node -e \"require\\(''''./src/app/\\(protected\\)/trips/page.tsx''''\\)\")",
+      "Bash(type \"c:\\\\Users\\\\theoy\\\\OneDrive\\\\Desktop\\\\life-planner\\\\src\\\\app\\\\\\(protected\\)\\\\trips\\\\page.tsx\")",
+      "Bash(cat \"c:\\\\Users\\\\theoy\\\\OneDrive\\\\Desktop\\\\life-planner\\\\src\\\\app\\\\\\(protected\\)\\\\trips\\\\page.tsx\")",
+      "Bash(taskkill //F //IM node.exe)",
+      "Bash(rm -rf .next node_modules/.cache)",
+      "Bash(gh pr:*)",
+      "Read(//c/Program Files/**)",
+      "Read(//c/Program Files \\(x86\\)/**)",
+      "Read(//c/Users/theoy/OneDrive/Desktop/life-planner/$LOCALAPPDATA/Programs/**)",
+      "Bash(npm uninstall:*)"
     ]
   }
 }
