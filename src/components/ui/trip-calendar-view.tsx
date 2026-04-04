@@ -347,7 +347,6 @@ function ActivityEditorModal({
               Title <span className="text-red-400">*</span>
             </label>
             <input
-              autoFocus
               type="text"
               placeholder="What are you doing?"
               value={form.title}
