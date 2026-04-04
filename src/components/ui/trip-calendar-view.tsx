@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useOwnerId } from "@/lib/household-context";
 import type { TripDay, TripActivity, ActivityCategory } from "@/types";
@@ -1421,9 +1422,17 @@ export function TripCalendarView({
   return (
     <div className="flex flex-col gap-4 min-w-0 w-full">
       {/* ── Toolbar ── */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        {/* Legend — hidden on mobile to save space */}
-        <div className="hidden sm:flex flex-wrap gap-x-4 gap-y-1.5">
+      <div className="flex items-center gap-2 min-w-0">
+        {/* Back link */}
+        <Link
+          href="/trips"
+          className="text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors shrink-0"
+        >
+          ← Back
+        </Link>
+
+        {/* Legend — desktop only */}
+        <div className="hidden sm:flex flex-wrap gap-x-4 gap-y-1.5 flex-1 ml-2">
           {CATEGORY_ORDER.map((cat) => {
             const config = CATEGORY_CONFIG[cat];
             return (
@@ -1437,26 +1446,26 @@ export function TripCalendarView({
           })}
         </div>
 
+        {/* Spacer on mobile */}
+        <div className="flex-1 sm:hidden" />
+
         {/* Timezone picker */}
-        <div className="flex items-center gap-1.5 ml-auto mr-2">
-          <span className="text-xs text-[var(--color-text-muted)]">🌍</span>
-          <select
-            value={timezone}
-            onChange={async (e) => {
-              const tz = e.target.value;
-              setTimezone(tz);
-              await supabase.from("trips").update({ timezone: tz }).eq("id", tripId);
-            }}
-            className="text-xs border border-[var(--color-border)] rounded-lg px-2 py-1.5 bg-white text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-600)]/30 max-w-[160px]"
-          >
-            {COMMON_TIMEZONES.map((tz) => (
-              <option key={tz.value} value={tz.value}>{tz.label}</option>
-            ))}
-          </select>
-        </div>
+        <select
+          value={timezone}
+          onChange={async (e) => {
+            const tz = e.target.value;
+            setTimezone(tz);
+            await supabase.from("trips").update({ timezone: tz }).eq("id", tripId);
+          }}
+          className="text-xs border border-[var(--color-border)] rounded-lg px-2 py-1.5 bg-white text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-600)]/30 max-w-[160px]"
+        >
+          {COMMON_TIMEZONES.map((tz) => (
+            <option key={tz.value} value={tz.value}>{tz.label}</option>
+          ))}
+        </select>
 
         {/* View toggle */}
-        <div className="flex items-center rounded-lg border border-[var(--color-border)] overflow-hidden text-sm">
+        <div className="flex items-center rounded-lg border border-[var(--color-border)] overflow-hidden text-sm shrink-0">
           <button
             onClick={() => setView("calendar")}
             className={`px-3 py-1.5 transition-colors ${
