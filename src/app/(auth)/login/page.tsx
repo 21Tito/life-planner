@@ -18,6 +18,11 @@ function LoginForm() {
       provider: "google",
       options: {
         redirectTo: callbackUrl,
+        scopes: "https://www.googleapis.com/auth/calendar.events",
+        queryParams: {
+          access_type: "offline",
+          prompt: "consent",
+        },
       },
     });
     if (error) {

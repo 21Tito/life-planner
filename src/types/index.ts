@@ -92,6 +92,7 @@ export interface Trip {
   notes: string | null;
   budget_cents: number | null;
   cover_image_url: string | null;
+  timezone: string;
   created_at: string;
   updated_at: string;
 }
@@ -121,6 +122,7 @@ export interface TripActivity {
   cost_cents: number | null;
   booking_url: string | null;
   sort_order: number;
+  gcal_event_id: string | null;
   created_at: string;
 }
 
@@ -134,31 +136,13 @@ export type ActivityCategory =
   | "rest"
   | "other";
 
-export interface PushSubscription {
-  id: string;
+export interface GoogleTokens {
   user_id: string;
-  endpoint: string;
-  p256dh: string;
-  auth: string;
-  created_at: string;
+  access_token: string;
+  refresh_token: string;
+  expires_at: string;
+  updated_at: string;
 }
-
-export interface TripReminder {
-  id: string;
-  user_id: string;
-  activity_id: string;
-  remind_at: string;
-  remind_minutes_before: number;
-  sent: boolean;
-  created_at: string;
-}
-
-export const REMINDER_OPTIONS = [
-  { label: "15 minutes before", value: 15 },
-  { label: "30 minutes before", value: 30 },
-  { label: "1 hour before", value: 60 },
-  { label: "1 day before", value: 1440 },
-] as const;
 
 // ===========================================
 // API request/response types
