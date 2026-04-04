@@ -73,13 +73,14 @@ const CATEGORY_CONFIG: Record<
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const HOUR_HEIGHT = 80;
-const START_HOUR = 6;
-const END_HOUR = 23;
+const START_HOUR = 1;
+const END_HOUR = 24;
 const TIME_COL_WIDTH = 52;
 const TOTAL_HEIGHT = (END_HOUR - START_HOUR) * HOUR_HEIGHT;
 
+// +1 to include midnight label at the very bottom
 const hours = Array.from(
-  { length: END_HOUR - START_HOUR },
+  { length: END_HOUR - START_HOUR + 1 },
   (_, i) => START_HOUR + i
 );
 
@@ -182,6 +183,7 @@ function formatDisplayTime(time: string): string {
 }
 
 function formatHourLabel(hour: number): string {
+  if (hour === 0 || hour === 24) return "12 AM";
   if (hour === 12) return "12 PM";
   return hour > 12 ? `${hour - 12} PM` : `${hour} AM`;
 }
@@ -889,89 +891,83 @@ function CalendarGrid({
   return (
     <div
       ref={scrollContainerRef}
-      className="overflow-x-hidden overflow-y-auto rounded-xl border border-[var(--color-border)] bg-white w-full min-w-0"
+      className="overflow-auto rounded-xl border border-[var(--color-border)] bg-white w-full min-w-0"
       style={{ maxHeight: "78vh" }}
     >
-      <div className="flex flex-col w-full min-w-0 overflow-hidden">
-        {/* ══ STICKY HEADER GROUP (sticks to top while scrolling down) ══ */}
-        <div className="sticky top-0 z-20 flex flex-col">
-
-          {/* Row 1: Day number + date */}
-          <div className="flex bg-gray-50 border-b border-[var(--color-border)]">
-            <div
-              className="sticky left-0 z-10 bg-gray-50 border-r border-[var(--color-border)] flex-shrink-0"
-              style={{ width: TIME_COL_WIDTH }}
-            />
-            {days.map((day) => {
-              const d = new Date(day.date + "T00:00:00");
-              return (
-                <div
-                  key={day.id}
-                  className="flex-1 min-w-0 border-r border-[var(--color-border)] last:border-r-0"
-                >
-                  {/* Compact header that works at any width */}
-                  <div className="flex flex-col items-center justify-center py-2 gap-0.5">
-                    <span className="text-[9px] font-semibold uppercase tracking-widest text-[var(--color-text-muted)]">
-                      {d.toLocaleDateString("en-US", { weekday: "short" })}
-                    </span>
-                    <span className="text-base font-bold text-[var(--color-brand-600)] leading-none">
-                      {d.getDate()}
-                    </span>
-                  </div>
+      <div className="flex flex-col min-w-0">
+        {/* ══ STICKY DATE ROW (sticks to top while scrolling down) ══ */}
+        <div className="sticky top-0 z-20 flex bg-gray-50 border-b border-[var(--color-border)]">
+          <div
+            className="sticky left-0 z-10 bg-gray-50 border-r border-[var(--color-border)] flex-shrink-0"
+            style={{ width: TIME_COL_WIDTH }}
+          />
+          {days.map((day) => {
+            const d = new Date(day.date + "T00:00:00");
+            return (
+              <div
+                key={day.id}
+                className="flex-1 border-r border-[var(--color-border)] last:border-r-0" style={{ minWidth: 100 }}
+              >
+                <div className="flex flex-col items-center justify-center py-2 gap-0.5">
+                  <span className="text-[9px] font-semibold uppercase tracking-widest text-[var(--color-text-muted)]">
+                    {d.toLocaleDateString("en-US", { weekday: "short" })}
+                  </span>
+                  <span className="text-base font-bold text-[var(--color-brand-600)] leading-none">
+                    {d.getDate()}
+                  </span>
                 </div>
-              );
-            })}
-          </div>
-
-          {/* Row 2: City */}
-          <div className="flex bg-white border-b border-[var(--color-border)]" style={{ height: 34 }}>
-            <div
-              className="sticky left-0 z-10 bg-white border-r border-[var(--color-border)] flex-shrink-0 flex items-center justify-end pr-2"
-              style={{ width: TIME_COL_WIDTH }}
-            >
-              <span className="text-[9px] font-semibold text-[var(--color-text-muted)] uppercase tracking-wider">
-                City
-              </span>
-            </div>
-            {days.map((day) => (
-              <div
-                key={day.id}
-                className="flex-1 min-w-0 border-r border-[var(--color-border)] last:border-r-0"
-              >
-                <InlineEditCell
-                  value={day.title}
-                  placeholder="Add city…"
-                  onSave={(v) => onUpdateDayField?.(day.id, "title", v)}
-                />
               </div>
-            ))}
-          </div>
+            );
+          })}
+        </div>
 
-          {/* Row 3: Hotel */}
-          <div className="flex border-b border-[var(--color-border)]" style={{ backgroundColor: "rgb(255 247 237 / 0.5)", height: 34 }}>
+        {/* Row 2: City */}
+        <div className="flex bg-white border-b border-[var(--color-border)]" style={{ height: 34 }}>
+          <div
+            className="sticky left-0 z-10 bg-white border-r border-[var(--color-border)] flex-shrink-0 flex items-center justify-end pr-2"
+            style={{ width: TIME_COL_WIDTH }}
+          >
+            <span className="text-[9px] font-semibold text-[var(--color-text-muted)] uppercase tracking-wider">
+              City
+            </span>
+          </div>
+          {days.map((day) => (
             <div
-              className="sticky left-0 z-10 border-r border-[var(--color-border)] flex-shrink-0 flex items-center justify-end pr-2"
-              style={{ width: TIME_COL_WIDTH, backgroundColor: "rgb(255 247 237 / 0.5)" }}
+              key={day.id}
+              className="flex-1 border-r border-[var(--color-border)] last:border-r-0" style={{ minWidth: 100 }}
             >
-              <span className="text-[9px] font-semibold text-[var(--color-text-muted)] uppercase tracking-wider">
-                Hotel
-              </span>
+              <InlineEditCell
+                value={day.title}
+                placeholder="Add city…"
+                onSave={(v) => onUpdateDayField?.(day.id, "title", v)}
+              />
             </div>
-            {days.map((day) => (
-              <div
-                key={day.id}
-                className="flex-1 min-w-0 border-r border-[var(--color-border)] last:border-r-0"
-              >
-                <InlineEditCell
-                  value={day.notes}
-                  placeholder="Add hotel or paste Maps link…"
-                  onSave={(v) => onUpdateDayField?.(day.id, "notes", v)}
-                  enableUrlResolve
-                />
-              </div>
-            ))}
-          </div>
+          ))}
+        </div>
 
+        {/* Row 3: Hotel */}
+        <div className="flex border-b border-[var(--color-border)]" style={{ backgroundColor: "rgb(255 247 237 / 0.5)", height: 34 }}>
+          <div
+            className="sticky left-0 z-10 border-r border-[var(--color-border)] flex-shrink-0 flex items-center justify-end pr-2"
+            style={{ width: TIME_COL_WIDTH, backgroundColor: "rgb(255 247 237 / 0.5)" }}
+          >
+            <span className="text-[9px] font-semibold text-[var(--color-text-muted)] uppercase tracking-wider">
+              Hotel
+            </span>
+          </div>
+          {days.map((day) => (
+            <div
+              key={day.id}
+              className="flex-1 border-r border-[var(--color-border)] last:border-r-0" style={{ minWidth: 100 }}
+            >
+              <InlineEditCell
+                value={day.notes}
+                placeholder="Add hotel or paste Maps link…"
+                onSave={(v) => onUpdateDayField?.(day.id, "notes", v)}
+                enableUrlResolve
+              />
+            </div>
+          ))}
         </div>
 
         {/* ══ SCROLLABLE BODY ══ */}
@@ -1004,7 +1000,7 @@ function CalendarGrid({
               return (
                 <div
                   key={day.id}
-                  className="flex-1 min-w-0 border-r border-[var(--color-border)] last:border-r-0"
+                  className="flex-1 border-r border-[var(--color-border)] last:border-r-0" style={{ minWidth: 100 }}
                 >
 
                   {/* Time grid */}
