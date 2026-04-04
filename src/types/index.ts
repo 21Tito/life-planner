@@ -134,6 +134,32 @@ export type ActivityCategory =
   | "rest"
   | "other";
 
+export interface PushSubscription {
+  id: string;
+  user_id: string;
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+  created_at: string;
+}
+
+export interface TripReminder {
+  id: string;
+  user_id: string;
+  activity_id: string;
+  remind_at: string;
+  remind_minutes_before: number;
+  sent: boolean;
+  created_at: string;
+}
+
+export const REMINDER_OPTIONS = [
+  { label: "15 minutes before", value: 15 },
+  { label: "30 minutes before", value: 30 },
+  { label: "1 hour before", value: 60 },
+  { label: "1 day before", value: 1440 },
+] as const;
+
 // ===========================================
 // API request/response types
 // ===========================================
