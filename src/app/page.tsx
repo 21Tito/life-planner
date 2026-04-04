@@ -107,7 +107,7 @@ export default function HomePage() {
       </div>
 
       {/* Features */}
-      <div className="border-t border-border bg-card px-4 lg:px-6 py-12 lg:py-16">
+      <div className="border-t border-border bg-card px-4 lg:px-6 py-12 lg:py-16 relative">
         <div className="max-w-4xl mx-auto grid gap-8 grid-cols-1 sm:grid-cols-3">
           {FEATURES.map(({ icon, title, description }) => (
             <div key={title} className="flex items-start gap-4 sm:flex-col sm:items-start sm:gap-3">
@@ -121,6 +121,9 @@ export default function HomePage() {
             </div>
           ))}
         </div>
+        <p className="text-center text-xs text-muted-foreground mt-10">
+          <a href="/privacy" className="underline hover:text-foreground transition-colors">Privacy Policy</a>
+        </p>
       </div>
     </main>
   );
