@@ -4,6 +4,8 @@ import { useState, useEffect, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useOwnerId } from "@/lib/household-context";
 import type { TripDay, TripActivity, ActivityCategory } from "@/types";
+import { REMINDER_OPTIONS } from "@/types";
+import { Bell, BellOff } from "lucide-react";
 
 // ─── Category config ──────────────────────────────────────────────────────────
 
@@ -119,6 +121,7 @@ type ActivityFormData = {
   description: string;
   cost: string;
   link: string;
+  reminder_minutes: number | null;
 };
 
 type EditorState = {
@@ -184,6 +187,7 @@ function makeDefaultForm(hour: number): ActivityFormData {
     description: "",
     cost: "",
     link: "",
+    reminder_minutes: null,
   };
 }
 
@@ -390,6 +394,57 @@ function ActivityEditorModal({
               />
             </div>
           </div>
+
+          {/* Reminder */}
+          {form.start_time && (
+            <div>
+              <label className="block text-sm font-medium mb-1.5">
+                Reminder
+              </label>
+              {form.reminder_minutes === null ? (
+                <button
+                  type="button"
+                  onClick={() => setForm({ ...form, reminder_minutes: 60 })}
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-200 text-sm text-gray-500 hover:bg-gray-50 hover:border-gray-300 transition-colors w-full"
+                >
+                  <Bell className="w-4 h-4" />
+                  <span>Add reminder</span>
+                </button>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-1">
+                    <Bell className="w-4 h-4 text-[var(--color-brand-600)] shrink-0" />
+                    <select
+                      value={form.reminder_minutes}
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          reminder_minutes: Number(e.target.value),
+                        })
+                      }
+                      className="flex-1 h-10 px-3 rounded-lg border border-gray-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-600)]/30 focus:border-[var(--color-brand-600)]"
+                    >
+                      {REMINDER_OPTIONS.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setForm({ ...form, reminder_minutes: null })
+                    }
+                    className="w-10 h-10 flex items-center justify-center rounded-lg border border-gray-200 text-gray-400 hover:text-red-500 hover:border-red-200 transition-colors shrink-0"
+                    title="Remove reminder"
+                  >
+                    <BellOff className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Footer */}
@@ -1006,6 +1061,7 @@ export function TripCalendarView({
         description: "",
         cost: "",
         link: "",
+        reminder_minutes: null,
       },
     });
   }
@@ -1019,8 +1075,21 @@ export function TripCalendarView({
     setTappedActivity({ activity, dayId });
   }
 
-  function openEditEditor(activity: TripActivity, dayId: string) {
+  async function openEditEditor(activity: TripActivity, dayId: string) {
     const day = days.find((d) => d.id === dayId);
+
+    // Fetch existing reminder for this activity
+    let reminderMinutes: number | null = null;
+    const { data: existingReminder } = await supabase
+      .from("trip_reminders")
+      .select("remind_minutes_before")
+      .eq("activity_id", activity.id)
+      .limit(1)
+      .single();
+    if (existingReminder) {
+      reminderMinutes = existingReminder.remind_minutes_before;
+    }
+
     setEditorState({
       dayId,
       dayDate: day?.date ?? "",
@@ -1040,8 +1109,36 @@ export function TripCalendarView({
           ? String(activity.cost_cents / 100)
           : "",
         link: activity.booking_url ?? "",
+        reminder_minutes: reminderMinutes,
       },
     });
+  }
+
+  async function saveReminder(
+    activityId: string,
+    reminderMinutes: number | null,
+    activityDate: string,
+    activityTime: string | null
+  ) {
+    if (reminderMinutes !== null && activityTime) {
+      await fetch("/api/push/reminders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          activity_id: activityId,
+          remind_minutes_before: reminderMinutes,
+          activity_date: activityDate,
+          activity_time: activityTime,
+        }),
+      });
+    } else {
+      // Remove any existing reminder
+      await fetch("/api/push/reminders", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ activity_id: activityId }),
+      });
+    }
   }
 
   async function handleSave(form: ActivityFormData) {
@@ -1083,6 +1180,12 @@ export function TripCalendarView({
                 : d
             )
           );
+          await saveReminder(
+            actId,
+            form.reminder_minutes,
+            editorState.dayDate,
+            form.start_time || null
+          );
           setEditorState(null);
         }
       } else {
@@ -1118,6 +1221,12 @@ export function TripCalendarView({
                   }
                 : d
             )
+          );
+          await saveReminder(
+            data.id,
+            form.reminder_minutes,
+            editorState.dayDate,
+            form.start_time || null
           );
           setEditorState(null);
         }

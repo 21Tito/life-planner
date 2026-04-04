@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import type { TripDay, TripActivity } from "@/types";
 import { TripCalendarView } from "@/components/ui/trip-calendar-view";
+import { NotificationPrompt } from "@/components/ui/notification-prompt";
 
 export default async function TripDetailPage({
   params,
@@ -59,6 +60,9 @@ export default async function TripDetailPage({
           {trip.budget_cents &&
             ` · Budget: $${(trip.budget_cents / 100).toFixed(0)}`}
         </p>
+        <div className="mt-2">
+          <NotificationPrompt />
+        </div>
       </div>
 
       {tripDays.length === 0 ? (
