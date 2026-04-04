@@ -4,8 +4,6 @@ import { useState, useEffect, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useOwnerId } from "@/lib/household-context";
 import type { TripDay, TripActivity, ActivityCategory } from "@/types";
-import { REMINDER_OPTIONS } from "@/types";
-import { Bell, BellOff } from "lucide-react";
 
 // ─── Category config ──────────────────────────────────────────────────────────
 
@@ -108,6 +106,43 @@ const CATEGORY_ORDER: ActivityCategory[] = [
   "other",
 ];
 
+// ─── Timezone list ────────────────────────────────────────────────────────────
+
+const COMMON_TIMEZONES = [
+  { value: "UTC", label: "UTC" },
+  { value: "America/New_York", label: "New York (ET)" },
+  { value: "America/Chicago", label: "Chicago (CT)" },
+  { value: "America/Denver", label: "Denver (MT)" },
+  { value: "America/Los_Angeles", label: "Los Angeles (PT)" },
+  { value: "America/Anchorage", label: "Anchorage (AKT)" },
+  { value: "Pacific/Honolulu", label: "Honolulu (HT)" },
+  { value: "America/Toronto", label: "Toronto (ET)" },
+  { value: "America/Vancouver", label: "Vancouver (PT)" },
+  { value: "America/Mexico_City", label: "Mexico City (CT)" },
+  { value: "America/Sao_Paulo", label: "São Paulo (BRT)" },
+  { value: "America/Buenos_Aires", label: "Buenos Aires (ART)" },
+  { value: "Europe/London", label: "London (GMT/BST)" },
+  { value: "Europe/Lisbon", label: "Lisbon (WET/WEST)" },
+  { value: "Europe/Paris", label: "Paris (CET)" },
+  { value: "Europe/Berlin", label: "Berlin (CET)" },
+  { value: "Europe/Amsterdam", label: "Amsterdam (CET)" },
+  { value: "Europe/Rome", label: "Rome (CET)" },
+  { value: "Europe/Madrid", label: "Madrid (CET)" },
+  { value: "Europe/Athens", label: "Athens (EET)" },
+  { value: "Europe/Istanbul", label: "Istanbul (TRT)" },
+  { value: "Africa/Cairo", label: "Cairo (EET)" },
+  { value: "Africa/Johannesburg", label: "Johannesburg (SAST)" },
+  { value: "Asia/Dubai", label: "Dubai (GST)" },
+  { value: "Asia/Bangkok", label: "Bangkok (ICT)" },
+  { value: "Asia/Singapore", label: "Singapore (SGT)" },
+  { value: "Asia/Tokyo", label: "Tokyo (JST)" },
+  { value: "Asia/Seoul", label: "Seoul (KST)" },
+  { value: "Asia/Shanghai", label: "Shanghai (CST)" },
+  { value: "Asia/Kolkata", label: "Mumbai/Delhi (IST)" },
+  { value: "Australia/Sydney", label: "Sydney (AEDT)" },
+  { value: "Pacific/Auckland", label: "Auckland (NZST)" },
+];
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type DayWithActivities = TripDay & { trip_activities: TripActivity[] };
@@ -121,7 +156,6 @@ type ActivityFormData = {
   description: string;
   cost: string;
   link: string;
-  reminder_minutes: number | null;
 };
 
 type EditorState = {
@@ -176,6 +210,38 @@ function getActivityPosition(
   return { top, height };
 }
 
+const SNAP_MINUTES = 15;
+
+function snapToGrid(minutes: number): number {
+  return Math.round(minutes / SNAP_MINUTES) * SNAP_MINUTES;
+}
+
+function minutesToTime(minutes: number): string {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
+function formatMinutes(totalMinutes: number): string {
+  const h = Math.floor(totalMinutes / 60);
+  const m = totalMinutes % 60;
+  const ampm = h >= 12 ? "PM" : "AM";
+  const displayH = h % 12 || 12;
+  return `${displayH}:${String(m).padStart(2, "0")} ${ampm}`;
+}
+
+type ActDragState = {
+  type: "move" | "resize";
+  activityId: string;
+  activity: TripActivity;
+  dayId: string;
+  grabOffsetMinutes: number;
+  startMinutes: number;
+  endMinutes: number;
+  durationMinutes: number;
+  columnTop: number;
+};
+
 function makeDefaultForm(hour: number): ActivityFormData {
   const endHour = Math.min(hour + 1, END_HOUR);
   return {
@@ -187,7 +253,6 @@ function makeDefaultForm(hour: number): ActivityFormData {
     description: "",
     cost: "",
     link: "",
-    reminder_minutes: null,
   };
 }
 
@@ -395,56 +460,6 @@ function ActivityEditorModal({
             </div>
           </div>
 
-          {/* Reminder */}
-          {form.start_time && (
-            <div>
-              <label className="block text-sm font-medium mb-1.5">
-                Reminder
-              </label>
-              {form.reminder_minutes === null ? (
-                <button
-                  type="button"
-                  onClick={() => setForm({ ...form, reminder_minutes: 60 })}
-                  className="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-200 text-sm text-gray-500 hover:bg-gray-50 hover:border-gray-300 transition-colors w-full"
-                >
-                  <Bell className="w-4 h-4" />
-                  <span>Add reminder</span>
-                </button>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <div className="flex items-center gap-2 flex-1">
-                    <Bell className="w-4 h-4 text-[var(--color-brand-600)] shrink-0" />
-                    <select
-                      value={form.reminder_minutes}
-                      onChange={(e) =>
-                        setForm({
-                          ...form,
-                          reminder_minutes: Number(e.target.value),
-                        })
-                      }
-                      className="flex-1 h-10 px-3 rounded-lg border border-gray-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-600)]/30 focus:border-[var(--color-brand-600)]"
-                    >
-                      {REMINDER_OPTIONS.map((opt) => (
-                        <option key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setForm({ ...form, reminder_minutes: null })
-                    }
-                    className="w-10 h-10 flex items-center justify-center rounded-lg border border-gray-200 text-gray-400 hover:text-red-500 hover:border-red-200 transition-colors shrink-0"
-                    title="Remove reminder"
-                  >
-                    <BellOff className="w-4 h-4" />
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
         </div>
 
         {/* Footer */}
@@ -711,19 +726,91 @@ function CalendarGrid({
   onCellClick,
   onActivityEdit,
   onUpdateDayField,
+  onActivityTimeUpdate,
 }: {
   days: DayWithActivities[];
   onCellClick?: (dayId: string, dayDate: string, startHour: number, endHour: number) => void;
   onActivityEdit?: (activity: TripActivity, dayId: string) => void;
   onUpdateDayField?: (dayId: string, field: "title" | "notes", value: string) => void;
+  onActivityTimeUpdate?: (activityId: string, dayId: string, startTime: string, endTime: string) => void;
 }) {
-  // Drag-to-select state
+  // Drag-to-select (create) state
   const [dragState, setDragState] = useState<{
     dayId: string;
     dayDate: string;
     startHour: number;
     currentHour: number;
   } | null>(null);
+
+  // Activity drag (move/resize) state
+  const [actDrag, setActDrag] = useState<ActDragState | null>(null);
+  const actDragRef = useRef<ActDragState | null>(null);
+  const dragMovedRef = useRef(false);
+  const dragStartPosRef = useRef({ x: 0, y: 0 });
+
+  // Keep ref in sync with state
+  useEffect(() => {
+    actDragRef.current = actDrag;
+  }, [actDrag]);
+
+  // Global mouse handlers for activity drag
+  useEffect(() => {
+    if (!actDrag) return;
+
+    function onMove(e: MouseEvent) {
+      if (!dragMovedRef.current) {
+        const dx = e.clientX - dragStartPosRef.current.x;
+        const dy = e.clientY - dragStartPosRef.current.y;
+        if (Math.sqrt(dx * dx + dy * dy) > 5) dragMovedRef.current = true;
+      }
+
+      setActDrag((prev) => {
+        if (!prev) return null;
+        const rawMinutes =
+          ((e.clientY - prev.columnTop) / HOUR_HEIGHT) * 60 + START_HOUR * 60;
+        if (prev.type === "move") {
+          const snapped = snapToGrid(rawMinutes - prev.grabOffsetMinutes);
+          const clamped = Math.max(
+            START_HOUR * 60,
+            Math.min(END_HOUR * 60 - prev.durationMinutes, snapped)
+          );
+          return { ...prev, startMinutes: clamped, endMinutes: clamped + prev.durationMinutes };
+        } else {
+          const snapped = snapToGrid(rawMinutes);
+          const clamped = Math.max(
+            prev.startMinutes + SNAP_MINUTES,
+            Math.min(END_HOUR * 60, snapped)
+          );
+          return { ...prev, endMinutes: clamped };
+        }
+      });
+    }
+
+    function onUp() {
+      const drag = actDragRef.current;
+      if (!drag) return;
+      if (dragMovedRef.current) {
+        onActivityTimeUpdate?.(
+          drag.activityId,
+          drag.dayId,
+          minutesToTime(drag.startMinutes),
+          minutesToTime(drag.endMinutes)
+        );
+      } else {
+        onActivityEdit?.(drag.activity, drag.dayId);
+      }
+      setActDrag(null);
+      dragMovedRef.current = false;
+    }
+
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [!!actDrag]);
 
   const hasUnscheduled = days.some((d) =>
     d.trip_activities?.some((a) => {
@@ -743,7 +830,7 @@ function CalendarGrid({
   }
 
   function handleMouseDown(e: React.MouseEvent<HTMLDivElement>, day: DayWithActivities) {
-    if (!onCellClick) return;
+    if (!onCellClick || actDrag) return;
     const hour = getHourFromY(e);
     setDragState({ dayId: day.id, dayDate: day.date, startHour: hour, currentHour: hour });
   }
@@ -762,6 +849,61 @@ function CalendarGrid({
     const toHour = Math.max(dragState.startHour, dragState.currentHour) + 1;
     onCellClick(dragState.dayId, dragState.dayDate, fromHour, toHour);
     setDragState(null);
+  }
+
+  function startActivityMove(
+    e: React.MouseEvent,
+    activity: TripActivity,
+    dayId: string
+  ) {
+    e.stopPropagation();
+    if (!activity.start_time) { onActivityEdit?.(activity, dayId); return; }
+    const startMins = timeToMinutes(activity.start_time);
+    const endMins = activity.end_time ? timeToMinutes(activity.end_time) : startMins + 60;
+    const cardRect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const pos = getActivityPosition(activity)!;
+    const columnTop = cardRect.top - pos.top - 2;
+    dragStartPosRef.current = { x: e.clientX, y: e.clientY };
+    dragMovedRef.current = false;
+    setActDrag({
+      type: "move",
+      activityId: activity.id,
+      activity,
+      dayId,
+      grabOffsetMinutes: ((e.clientY - cardRect.top) / HOUR_HEIGHT) * 60,
+      startMinutes: startMins,
+      endMinutes: endMins,
+      durationMinutes: endMins - startMins,
+      columnTop,
+    });
+  }
+
+  function startActivityResize(
+    e: React.MouseEvent,
+    activity: TripActivity,
+    dayId: string
+  ) {
+    e.stopPropagation();
+    if (!activity.start_time) return;
+    const startMins = timeToMinutes(activity.start_time);
+    const endMins = activity.end_time ? timeToMinutes(activity.end_time) : startMins + 60;
+    const card = (e.currentTarget as HTMLElement).closest("[data-act]") as HTMLElement;
+    const cardRect = card.getBoundingClientRect();
+    const pos = getActivityPosition(activity)!;
+    const columnTop = cardRect.top - pos.top - 2;
+    dragStartPosRef.current = { x: e.clientX, y: e.clientY };
+    dragMovedRef.current = false;
+    setActDrag({
+      type: "resize",
+      activityId: activity.id,
+      activity,
+      dayId,
+      grabOffsetMinutes: 0,
+      startMinutes: startMins,
+      endMinutes: endMins,
+      durationMinutes: endMins - startMins,
+      columnTop,
+    });
   }
 
   return (
@@ -976,42 +1118,58 @@ function CalendarGrid({
 
                     {/* Activity cards */}
                     {activities.map((activity) => {
-                      const pos = getActivityPosition(activity);
-                      if (!pos) return null;
+                      const isDragging = actDrag?.activityId === activity.id;
+                      const basePos = getActivityPosition(activity);
+                      if (!basePos && !isDragging) return null;
+
+                      const displayStartMins = isDragging ? actDrag!.startMinutes : (activity.start_time ? timeToMinutes(activity.start_time) : START_HOUR * 60);
+                      const displayEndMins = isDragging ? actDrag!.endMinutes : (activity.end_time ? timeToMinutes(activity.end_time) : displayStartMins + 60);
+                      const displayTop = (displayStartMins / 60 - START_HOUR) * HOUR_HEIGHT + 2;
+                      const displayHeight = Math.max(((displayEndMins - displayStartMins) / 60) * HOUR_HEIGHT - 4, 20);
+
+                      if (!isDragging && !basePos) return null;
                       const config = getCategoryConfig(activity.category);
 
                       return (
-                        <button
+                        <div
                           key={activity.id}
-                          onMouseDown={(e) => e.stopPropagation()}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onActivityEdit?.(activity, day.id);
-                          }}
-                          className={`absolute inset-x-1 rounded-lg border text-left overflow-hidden transition-all group hover:shadow-md hover:z-10 z-0 ${config.bg} ${config.border} ${config.text}`}
-                          style={{ top: pos.top + 2, height: pos.height }}
+                          data-act
+                          onMouseDown={(e) => startActivityMove(e, activity, day.id)}
+                          className={`absolute inset-x-1 rounded-lg border text-left overflow-hidden select-none group ${
+                            isDragging
+                              ? "shadow-xl z-30 opacity-90 cursor-grabbing"
+                              : "hover:shadow-md hover:z-10 z-0 cursor-grab"
+                          } ${config.bg} ${config.border} ${config.text}`}
+                          style={{ top: displayTop, height: displayHeight }}
                         >
-                          <div className="p-1.5 h-full flex flex-col overflow-hidden">
+                          <div className="p-1.5 h-full flex flex-col overflow-hidden pointer-events-none">
                             <span className="text-[11px] font-semibold leading-tight line-clamp-2">
                               {activity.title}
                             </span>
-                            {activity.description && pos.height >= 48 && (
+                            {activity.description && displayHeight >= 48 && !isDragging && (
                               <span className="text-[9px] leading-snug opacity-70 mt-0.5 line-clamp-2">
                                 {activity.description}
                               </span>
                             )}
-                            {pos.height >= 52 && activity.start_time && (
+                            {displayHeight >= 36 && (
                               <span className="text-[9px] opacity-60 mt-auto shrink-0">
-                                {formatDisplayTime(activity.start_time)}
-                                {activity.end_time &&
-                                  ` – ${formatDisplayTime(activity.end_time)}`}
+                                {isDragging
+                                  ? `${formatMinutes(actDrag!.startMinutes)} – ${formatMinutes(actDrag!.endMinutes)}`
+                                  : activity.start_time
+                                  ? `${formatDisplayTime(activity.start_time)}${activity.end_time ? ` – ${formatDisplayTime(activity.end_time)}` : ""}`
+                                  : ""}
                               </span>
                             )}
-                            <span className="absolute top-1 right-1 text-[10px] opacity-0 group-hover:opacity-70 transition-opacity">
-                              ✏️
-                            </span>
                           </div>
-                        </button>
+                          {/* Resize handle */}
+                          <div
+                            onMouseDown={(e) => startActivityResize(e, activity, day.id)}
+                            className="absolute bottom-0 left-0 right-0 h-3 cursor-ns-resize flex items-center justify-center pointer-events-auto"
+                            title="Drag to resize"
+                          >
+                            <div className="w-6 h-0.5 rounded-full bg-current opacity-0 group-hover:opacity-30 transition-opacity" />
+                          </div>
+                        </div>
                       );
                     })}
                   </div>
@@ -1030,13 +1188,18 @@ function CalendarGrid({
 
 export function TripCalendarView({
   days: initialDays,
+  tripId,
+  initialTimezone,
 }: {
   days: DayWithActivities[];
+  tripId: string;
+  initialTimezone: string;
 }) {
   const supabase = createClient();
   const userId = useOwnerId();
 
   const [days, setDays] = useState<DayWithActivities[]>(initialDays);
+  const [timezone, setTimezone] = useState(initialTimezone || "UTC");
   const [view, setView] = useState<"calendar" | "list">("calendar");
   const [editorState, setEditorState] = useState<EditorState | null>(null);
   const [saving, setSaving] = useState(false);
@@ -1061,7 +1224,6 @@ export function TripCalendarView({
         description: "",
         cost: "",
         link: "",
-        reminder_minutes: null,
       },
     });
   }
@@ -1077,18 +1239,6 @@ export function TripCalendarView({
 
   async function openEditEditor(activity: TripActivity, dayId: string) {
     const day = days.find((d) => d.id === dayId);
-
-    // Fetch existing reminder for this activity
-    let reminderMinutes: number | null = null;
-    const { data: existingReminder } = await supabase
-      .from("trip_reminders")
-      .select("remind_minutes_before")
-      .eq("activity_id", activity.id)
-      .limit(1)
-      .single();
-    if (existingReminder) {
-      reminderMinutes = existingReminder.remind_minutes_before;
-    }
 
     setEditorState({
       dayId,
@@ -1109,36 +1259,50 @@ export function TripCalendarView({
           ? String(activity.cost_cents / 100)
           : "",
         link: activity.booking_url ?? "",
-        reminder_minutes: reminderMinutes,
       },
     });
   }
 
-  async function saveReminder(
+  function syncToCalendar(
+    action: "create" | "update" | "delete",
     activityId: string,
-    reminderMinutes: number | null,
-    activityDate: string,
-    activityTime: string | null
+    dayDate: string,
+    dayId: string,
+    gcalEventId?: string | null
   ) {
-    if (reminderMinutes !== null && activityTime) {
-      await fetch("/api/push/reminders", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          activity_id: activityId,
-          remind_minutes_before: reminderMinutes,
-          activity_date: activityDate,
-          activity_time: activityTime,
-        }),
-      });
-    } else {
-      // Remove any existing reminder
-      await fetch("/api/push/reminders", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ activity_id: activityId }),
-      });
-    }
+    fetch("/api/calendar/sync", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action,
+        activity_id: activityId,
+        day_date: dayDate,
+        gcal_event_id: gcalEventId,
+        timezone,
+      }),
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        // After a create, store the returned gcal_event_id in local state
+        // so subsequent edits know to update instead of creating a new event
+        if (action === "create" && data.gcal_event_id) {
+          setDays((prev) =>
+            prev.map((d) =>
+              d.id === dayId
+                ? {
+                    ...d,
+                    trip_activities: d.trip_activities.map((a) =>
+                      a.id === activityId
+                        ? { ...a, gcal_event_id: data.gcal_event_id }
+                        : a
+                    ),
+                  }
+                : d
+            )
+          );
+        }
+      })
+      .catch(() => {});
   }
 
   async function handleSave(form: ActivityFormData) {
@@ -1180,12 +1344,15 @@ export function TripCalendarView({
                 : d
             )
           );
-          await saveReminder(
-            actId,
-            form.reminder_minutes,
-            editorState.dayDate,
-            form.start_time || null
-          );
+          if (form.start_time) {
+            syncToCalendar(
+              editorState.activity.gcal_event_id ? "update" : "create",
+              actId,
+              editorState.dayDate,
+              editorState.dayId,
+              editorState.activity.gcal_event_id
+            );
+          }
           setEditorState(null);
         }
       } else {
@@ -1222,12 +1389,9 @@ export function TripCalendarView({
                 : d
             )
           );
-          await saveReminder(
-            data.id,
-            form.reminder_minutes,
-            editorState.dayDate,
-            form.start_time || null
-          );
+          if (form.start_time) {
+            syncToCalendar("create", data.id, editorState.dayDate, editorState.dayId);
+          }
           setEditorState(null);
         }
       }
@@ -1248,6 +1412,15 @@ export function TripCalendarView({
       if (!error) {
         const { dayId } = editorState;
         const actId = editorState.activity.id;
+        if (editorState.activity.gcal_event_id) {
+          syncToCalendar(
+            "delete",
+            actId,
+            editorState.dayDate,
+            editorState.dayId,
+            editorState.activity.gcal_event_id
+          );
+        }
         setDays((prev) =>
           prev.map((d) =>
             d.id === dayId
@@ -1264,6 +1437,46 @@ export function TripCalendarView({
       }
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleActivityTimeUpdate(
+    activityId: string,
+    dayId: string,
+    startTime: string,
+    endTime: string
+  ) {
+    const day = days.find((d) => d.id === dayId);
+    const activity = day?.trip_activities.find((a) => a.id === activityId);
+    const updates = { start_time: startTime, end_time: endTime };
+
+    const { error } = await supabase
+      .from("trip_activities")
+      .update(updates)
+      .eq("id", activityId);
+
+    if (!error) {
+      setDays((prev) =>
+        prev.map((d) =>
+          d.id !== dayId
+            ? d
+            : {
+                ...d,
+                trip_activities: d.trip_activities.map((a) =>
+                  a.id !== activityId ? a : { ...a, ...updates }
+                ),
+              }
+        )
+      );
+      if (day && activity) {
+        syncToCalendar(
+          activity.gcal_event_id ? "update" : "create",
+          activityId,
+          day.date,
+          dayId,
+          activity.gcal_event_id
+        );
+      }
     }
   }
 
@@ -1301,8 +1514,26 @@ export function TripCalendarView({
           })}
         </div>
 
+        {/* Timezone picker */}
+        <div className="flex items-center gap-1.5 ml-auto mr-2">
+          <span className="text-xs text-[var(--color-text-muted)]">🌍</span>
+          <select
+            value={timezone}
+            onChange={async (e) => {
+              const tz = e.target.value;
+              setTimezone(tz);
+              await supabase.from("trips").update({ timezone: tz }).eq("id", tripId);
+            }}
+            className="text-xs border border-[var(--color-border)] rounded-lg px-2 py-1.5 bg-white text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-600)]/30 max-w-[160px]"
+          >
+            {COMMON_TIMEZONES.map((tz) => (
+              <option key={tz.value} value={tz.value}>{tz.label}</option>
+            ))}
+          </select>
+        </div>
+
         {/* View toggle */}
-        <div className="flex items-center rounded-lg border border-[var(--color-border)] overflow-hidden text-sm ml-auto">
+        <div className="flex items-center rounded-lg border border-[var(--color-border)] overflow-hidden text-sm">
           <button
             onClick={() => setView("calendar")}
             className={`px-3 py-1.5 transition-colors ${
@@ -1438,6 +1669,7 @@ export function TripCalendarView({
           onCellClick={openAddEditor}
           onActivityEdit={handleActivityTap}
           onUpdateDayField={handleUpdateDayField}
+          onActivityTimeUpdate={handleActivityTimeUpdate}
         />
       ) : (
         <ListView days={days} />
