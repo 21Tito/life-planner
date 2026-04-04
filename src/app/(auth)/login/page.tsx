@@ -69,6 +69,13 @@ function LoginForm() {
           </svg>
           {loading ? "Redirecting..." : "Continue with Google"}
         </button>
+
+        <p className="text-center text-xs text-[var(--color-text-muted)] mt-6">
+          By signing in you agree to our{" "}
+          <a href="/privacy" target="_blank" className="underline hover:text-[var(--color-text)] transition-colors">
+            Privacy Policy
+          </a>
+        </p>
       </div>
     </main>
   );
