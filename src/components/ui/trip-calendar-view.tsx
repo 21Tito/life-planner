@@ -722,6 +722,14 @@ function CalendarGrid({
     currentHour: number;
   } | null>(null);
 
+  // Scroll to 8 AM on mount
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTop = (8 - START_HOUR) * HOUR_HEIGHT;
+    }
+  }, []);
+
   // Activity drag (move/resize) state
   const [actDrag, setActDrag] = useState<ActDragState | null>(null);
   const actDragRef = useRef<ActDragState | null>(null);
@@ -880,6 +888,7 @@ function CalendarGrid({
 
   return (
     <div
+      ref={scrollContainerRef}
       className="overflow-x-hidden overflow-y-auto rounded-xl border border-[var(--color-border)] bg-white w-full min-w-0"
       style={{ maxHeight: "78vh" }}
     >
