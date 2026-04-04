@@ -352,7 +352,7 @@ function ActivityEditorModal({
               placeholder="What are you doing?"
               value={form.title}
               onChange={(e) => setForm({ ...form, title: e.target.value })}
-              className="w-full h-10 px-3 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-600)]/30 focus:border-[var(--color-brand-600)]"
+              className="w-full h-10 px-3 rounded-lg border border-gray-200 text-base focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-600)]/30 focus:border-[var(--color-brand-600)]"
             />
           </div>
 
@@ -365,7 +365,7 @@ function ActivityEditorModal({
               <select
                 value={form.start_time}
                 onChange={(e) => setForm({ ...form, start_time: e.target.value })}
-                className="w-full h-10 px-3 rounded-lg border border-gray-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-600)]/30 focus:border-[var(--color-brand-600)]"
+                className="w-full h-10 px-3 rounded-lg border border-gray-200 text-base bg-white focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-600)]/30 focus:border-[var(--color-brand-600)]"
               >
                 {TIME_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>
@@ -381,7 +381,7 @@ function ActivityEditorModal({
               <select
                 value={form.end_time}
                 onChange={(e) => setForm({ ...form, end_time: e.target.value })}
-                className="w-full h-10 px-3 rounded-lg border border-gray-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-600)]/30 focus:border-[var(--color-brand-600)]"
+                className="w-full h-10 px-3 rounded-lg border border-gray-200 text-base bg-white focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-600)]/30 focus:border-[var(--color-brand-600)]"
               >
                 {TIME_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>
@@ -403,7 +403,7 @@ function ActivityEditorModal({
               placeholder="Where is this?"
               value={form.location}
               onChange={(e) => setForm({ ...form, location: e.target.value })}
-              className="w-full h-10 px-3 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-600)]/30 focus:border-[var(--color-brand-600)]"
+              className="w-full h-10 px-3 rounded-lg border border-gray-200 text-base focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-600)]/30 focus:border-[var(--color-brand-600)]"
             />
           </div>
 
@@ -418,7 +418,7 @@ function ActivityEditorModal({
               placeholder="Google Maps link, booking URL, etc."
               value={form.link}
               onChange={(e) => setForm({ ...form, link: e.target.value })}
-              className="w-full h-10 px-3 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-600)]/30 focus:border-[var(--color-brand-600)]"
+              className="w-full h-10 px-3 rounded-lg border border-gray-200 text-base focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-600)]/30 focus:border-[var(--color-brand-600)]"
             />
           </div>
 
@@ -435,7 +435,7 @@ function ActivityEditorModal({
               onChange={(e) =>
                 setForm({ ...form, description: e.target.value })
               }
-              className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-600)]/30 focus:border-[var(--color-brand-600)]"
+              className="w-full px-3 py-2 rounded-lg border border-gray-200 text-base resize-none focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-600)]/30 focus:border-[var(--color-brand-600)]"
             />
           </div>
 
@@ -667,7 +667,7 @@ function InlineEditCell({
             setEditing(false);
           }
         }}
-        className="w-full px-3 py-1.5 text-sm bg-transparent focus:outline-none focus:bg-blue-50/50 min-h-[34px]"
+        className="w-full px-3 py-1.5 text-base bg-transparent focus:outline-none focus:bg-blue-50/50 min-h-[34px]"
         placeholder={placeholder}
       />
     </div>
