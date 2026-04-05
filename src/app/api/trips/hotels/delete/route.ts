@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { getSessionIds } from "@/lib/get-owner-id";
 import { NextResponse } from "next/server";
 
@@ -13,7 +14,12 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: "hotelId required" }, { status: 400 });
     }
 
-    const { error } = await supabase
+    const admin = createAdminClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+
+    const { error } = await admin
       .from("trip_hotels")
       .delete()
       .eq("id", hotelId)

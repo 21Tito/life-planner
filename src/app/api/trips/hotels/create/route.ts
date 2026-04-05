@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { getSessionIds } from "@/lib/get-owner-id";
 import { NextResponse } from "next/server";
 
@@ -17,7 +18,14 @@ export async function POST(request: Request) {
       );
     }
 
-    const { data: hotel, error } = await supabase
+    // Use admin client to bypass RLS — ownerId may differ from auth.uid()
+    // for household members, which would cause the user_id policy check to fail.
+    const admin = createAdminClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+
+    const { data: hotel, error } = await admin
       .from("trip_hotels")
       .insert({
         trip_id: tripId,

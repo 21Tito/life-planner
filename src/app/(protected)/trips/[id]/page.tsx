@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { notFound } from "next/navigation";
 import type { TripDay, TripActivity, TripHotel } from "@/types";
 import { TripCalendarView } from "@/components/ui/trip-calendar-view";
@@ -19,13 +20,18 @@ export default async function TripDetailPage({
 
   if (!trip) notFound();
 
+  const admin = createAdminClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
   const [{ data: days }, { data: hotels }] = await Promise.all([
     supabase
       .from("trip_days")
       .select("*, trip_activities(*)")
       .eq("trip_id", id)
       .order("day_number"),
-    supabase
+    admin
       .from("trip_hotels")
       .select("*")
       .eq("trip_id", id)
