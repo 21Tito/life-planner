@@ -457,20 +457,19 @@ export function TripsClient({ initialTrips }: Props) {
                 <Card className="hover:ring-primary/30 hover:shadow-md transition-all cursor-pointer">
                   <CardContent className="py-4 px-5">
                     <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-start gap-3 min-w-0">
+                      <div className="flex items-start gap-3 min-w-0 flex-1">
                         <div className="w-9 h-9 rounded-lg bg-secondary flex items-center justify-center text-primary/70 flex-shrink-0 mt-0.5">
                           {Icons.map}
                         </div>
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-semibold truncate">{trip.destination}</h3>
                             <Badge variant="secondary" className="flex-shrink-0 text-xs">
                               {tripDuration(trip.start_date, trip.end_date)}
                             </Badge>
-                            <h3 className="font-semibold truncate">{trip.title}</h3>
                           </div>
-                          <p className="text-xs lg:text-sm text-muted-foreground mt-0.5 truncate">
-                            {trip.destination} · {formatDate(trip.start_date)} –{" "}
-                            {formatDate(trip.end_date)}
+                          <p className="text-xs lg:text-sm text-muted-foreground mt-0.5">
+                            {formatDate(trip.start_date)} – {formatDate(trip.end_date)}
                           </p>
                         </div>
                       </div>
