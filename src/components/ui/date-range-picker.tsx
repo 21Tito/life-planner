@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { DayPicker } from "react-day-picker";
 import type { DateRange } from "react-day-picker";
 import "react-day-picker/style.css";
@@ -28,13 +29,31 @@ function nightCount(from: Date | undefined, to: Date | undefined): string {
 
 export function DateRangePicker({ value, onChange, placeholder = "Select dates" }: Props) {
   const [open, setOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const [popoverStyle, setPopoverStyle] = useState<React.CSSProperties>({});
+
+  // Position popover under trigger using fixed coords (escapes any overflow:hidden parent)
+  useEffect(() => {
+    if (!open || !triggerRef.current) return;
+    const rect = triggerRef.current.getBoundingClientRect();
+    setPopoverStyle({
+      position: "fixed",
+      top: rect.bottom + 6,
+      left: rect.left,
+      zIndex: 9999,
+    });
+  }, [open]);
 
   // Close on outside click
   useEffect(() => {
     if (!open) return;
     function handleClick(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (
+        triggerRef.current && !triggerRef.current.contains(target) &&
+        popoverRef.current && !popoverRef.current.contains(target)
+      ) {
         setOpen(false);
       }
     }
@@ -45,43 +64,33 @@ export function DateRangePicker({ value, onChange, placeholder = "Select dates" 
   const displayText = formatRange(value.from, value.to);
   const nights = nightCount(value.from, value.to);
 
-  return (
-    <div ref={containerRef} className="relative">
-      {/* Trigger */}
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className={`w-full h-10 px-3 rounded-lg border text-sm text-left flex items-center justify-between gap-2 transition-colors ${
-          open
-            ? "border-[var(--color-brand-600)] ring-2 ring-[var(--color-brand-600)]/20"
-            : "border-input hover:border-[var(--color-brand-600)]/50"
-        } bg-background`}
-      >
-        <span className={displayText ? "text-foreground" : "text-muted-foreground"}>
-          {displayText || placeholder}
-        </span>
-        <span className="flex items-center gap-1.5 shrink-0">
-          {nights && (
-            <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded-md">
-              {nights}
-            </span>
-          )}
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground">
-            <rect width="18" height="18" x="3" y="4" rx="2" ry="2" />
-            <line x1="16" x2="16" y1="2" y2="6" />
-            <line x1="8" x2="8" y1="2" y2="6" />
-            <line x1="3" x2="21" y1="10" y2="10" />
-          </svg>
-        </span>
-      </button>
-
-      {/* Popover */}
-      {open && (
-        <div className="absolute top-full left-0 mt-1.5 z-50 bg-white rounded-xl shadow-xl border border-border p-3 w-fit">
+  const popover = open
+    ? createPortal(
+        <div
+          ref={popoverRef}
+          style={popoverStyle}
+          className="bg-white rounded-xl shadow-xl border border-border p-3 w-fit"
+        >
           <DayPicker
             mode="range"
             selected={value as DateRange}
             onSelect={(range) => {
+              if (value.from && value.to) {
+                // Full range already set — any click starts a fresh selection.
+                // react-day-picker keeps the old `from` and puts the clicked
+                // date into `range.to` when clicking after `from`, so we must
+                // detect what was actually clicked:
+                //   • range.from differs from value.from → user clicked before from
+                //   • range.from same as value.from → user clicked on/after from,
+                //     actual clicked date is range.to (or value.from if same day)
+                const clickedDate = range?.from
+                  ? range.from.getTime() !== value.from.getTime()
+                    ? range.from
+                    : (range.to ?? value.from)
+                  : undefined;
+                onChange({ from: clickedDate, to: undefined });
+                return;
+              }
               onChange({ from: range?.from, to: range?.to });
               // Auto-close only when a real range (two distinct dates) is complete
               if (
@@ -131,8 +140,44 @@ export function DateRangePicker({ value, onChange, placeholder = "Select dates" 
               </button>
             </div>
           )}
-        </div>
-      )}
+        </div>,
+        document.body
+      )
+    : null;
+
+  return (
+    <div className="relative">
+      {/* Trigger */}
+      <button
+        ref={triggerRef}
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className={`w-full h-10 px-3 rounded-lg border text-sm text-left flex items-center justify-between gap-2 transition-colors ${
+          open
+            ? "border-[var(--color-brand-600)] ring-2 ring-[var(--color-brand-600)]/20"
+            : "border-input hover:border-[var(--color-brand-600)]/50"
+        } bg-background`}
+      >
+        <span className={displayText ? "text-foreground" : "text-muted-foreground"}>
+          {displayText || placeholder}
+        </span>
+        <span className="flex items-center gap-1.5 shrink-0">
+          {nights && (
+            <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded-md">
+              {nights}
+            </span>
+          )}
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground">
+            <rect width="18" height="18" x="3" y="4" rx="2" ry="2" />
+            <line x1="16" x2="16" y1="2" y2="6" />
+            <line x1="8" x2="8" y1="2" y2="6" />
+            <line x1="3" x2="21" y1="10" y2="10" />
+          </svg>
+        </span>
+      </button>
+
+      {/* Popover rendered via portal so it escapes any overflow:hidden parent */}
+      {popover}
     </div>
   );
 }
