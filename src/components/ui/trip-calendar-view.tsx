@@ -86,17 +86,14 @@ const hours = Array.from(
 );
 
 // Time select options: 1 AM to 12 AM (midnight)
-const TIME_OPTIONS = Array.from({ length: 24 }, (_, i) => {
-  const hour = i + 1;
-  const value = `${String(hour === 24 ? 0 : hour).padStart(2, "0")}:00`;
-  const label =
-    hour === 24
-      ? "12:00 AM"
-      : hour === 12
-      ? "12:00 PM"
-      : hour < 12
-      ? `${hour}:00 AM`
-      : `${hour - 12}:00 PM`;
+const TIME_OPTIONS = Array.from({ length: 47 }, (_, i) => {
+  const totalMinutes = (i + 2) * 30; // start at 01:00, end at midnight
+  const hour = Math.floor(totalMinutes / 60) % 24;
+  const minute = totalMinutes % 60;
+  const value = `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+  const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+  const ampm = hour < 12 || hour === 0 ? "AM" : "PM";
+  const label = `${displayHour}:${String(minute).padStart(2, "0")} ${ampm}`;
   return { value, label };
 });
 
