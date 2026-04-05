@@ -84,12 +84,14 @@ const hours = Array.from(
   (_, i) => START_HOUR + i
 );
 
-// Time select options: 4 AM to 11 PM in 1-hour increments
-const TIME_OPTIONS = Array.from({ length: 20 }, (_, i) => {
-  const hour = i + 4;
-  const value = `${String(hour).padStart(2, "0")}:00`;
+// Time select options: 1 AM to 12 AM (midnight)
+const TIME_OPTIONS = Array.from({ length: 24 }, (_, i) => {
+  const hour = i + 1;
+  const value = `${String(hour === 24 ? 0 : hour).padStart(2, "0")}:00`;
   const label =
-    hour === 12
+    hour === 24
+      ? "12:00 AM"
+      : hour === 12
       ? "12:00 PM"
       : hour < 12
       ? `${hour}:00 AM`
@@ -1139,6 +1141,11 @@ export function TripCalendarView({
     dayId: string;
   } | null>(null);
 
+  function hourToTimeStr(hour: number): string {
+    const h = hour >= 24 ? 0 : hour;
+    return `${String(h).padStart(2, "0")}:00`;
+  }
+
   function openAddEditor(dayId: string, dayDate: string, startHour: number, endHour: number) {
     setEditorState({
       dayId,
@@ -1147,8 +1154,8 @@ export function TripCalendarView({
       form: {
         title: "",
         category: "activity",
-        start_time: `${String(startHour).padStart(2, "0")}:00`,
-        end_time: `${String(Math.min(endHour, END_HOUR)).padStart(2, "0")}:00`,
+        start_time: hourToTimeStr(startHour),
+        end_time: hourToTimeStr(Math.min(endHour, END_HOUR)),
         location: "",
         description: "",
         cost: "",
