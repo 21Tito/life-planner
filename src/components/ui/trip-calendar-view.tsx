@@ -732,26 +732,32 @@ function CalendarGrid({
   const dragMovedRef = useRef(false);
   const dragStartPosRef = useRef({ x: 0, y: 0 });
 
+  // Touch long-press drag refs
+  const touchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const touchDragStartRef = useRef<{
+    clientX: number;
+    clientY: number;
+    activity: TripActivity;
+    dayId: string;
+    columnTop: number;
+    cardTop: number;
+  } | null>(null);
+  const isTouchDraggingRef = useRef(false);
+
   // Keep ref in sync with state
   useEffect(() => {
     actDragRef.current = actDrag;
   }, [actDrag]);
 
-  // Global mouse handlers for activity drag
+  // Global mouse + touch handlers for activity drag
   useEffect(() => {
     if (!actDrag) return;
 
-    function onMove(e: MouseEvent) {
-      if (!dragMovedRef.current) {
-        const dx = e.clientX - dragStartPosRef.current.x;
-        const dy = e.clientY - dragStartPosRef.current.y;
-        if (Math.sqrt(dx * dx + dy * dy) > 5) dragMovedRef.current = true;
-      }
-
+    function updateDragFromClientY(clientY: number) {
       setActDrag((prev) => {
         if (!prev) return null;
         const rawMinutes =
-          ((e.clientY - prev.columnTop) / HOUR_HEIGHT) * 60 + START_HOUR * 60;
+          ((clientY - prev.columnTop) / HOUR_HEIGHT) * 60 + START_HOUR * 60;
         if (prev.type === "move") {
           const snapped = snapToGrid(rawMinutes - prev.grabOffsetMinutes);
           const clamped = Math.max(
@@ -768,6 +774,15 @@ function CalendarGrid({
           return { ...prev, endMinutes: clamped };
         }
       });
+    }
+
+    function onMove(e: MouseEvent) {
+      if (!dragMovedRef.current) {
+        const dx = e.clientX - dragStartPosRef.current.x;
+        const dy = e.clientY - dragStartPosRef.current.y;
+        if (Math.sqrt(dx * dx + dy * dy) > 5) dragMovedRef.current = true;
+      }
+      updateDragFromClientY(e.clientY);
     }
 
     function onUp() {
@@ -787,11 +802,37 @@ function CalendarGrid({
       dragMovedRef.current = false;
     }
 
+    function onTouchMove(e: TouchEvent) {
+      if (!isTouchDraggingRef.current) return;
+      e.preventDefault(); // block scroll while dragging
+      updateDragFromClientY(e.touches[0].clientY);
+    }
+
+    function onTouchEnd() {
+      if (!isTouchDraggingRef.current) return;
+      const drag = actDragRef.current;
+      if (drag) {
+        onActivityTimeUpdate?.(
+          drag.activityId,
+          drag.dayId,
+          minutesToTime(drag.startMinutes),
+          minutesToTime(drag.endMinutes)
+        );
+      }
+      setActDrag(null);
+      isTouchDraggingRef.current = false;
+      touchDragStartRef.current = null;
+    }
+
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
+    window.addEventListener("touchmove", onTouchMove, { passive: false });
+    window.addEventListener("touchend", onTouchEnd);
     return () => {
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
+      window.removeEventListener("touchmove", onTouchMove);
+      window.removeEventListener("touchend", onTouchEnd);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [!!actDrag]);
@@ -880,6 +921,81 @@ function CalendarGrid({
       durationMinutes: endMins - startMins,
       columnTop,
     });
+  }
+
+  // ── Touch long-press drag (mobile) ───────────────────────────────────────
+
+  function cancelTouchLongPress() {
+    if (touchTimerRef.current) {
+      clearTimeout(touchTimerRef.current);
+      touchTimerRef.current = null;
+    }
+    if (!isTouchDraggingRef.current) touchDragStartRef.current = null;
+  }
+
+  function startActivityTouchDown(
+    e: React.TouchEvent,
+    activity: TripActivity,
+    dayId: string
+  ) {
+    if (!activity.start_time) return;
+    const touch = e.touches[0];
+    const cardEl = e.currentTarget as HTMLElement;
+    const cardRect = cardEl.getBoundingClientRect();
+    const pos = getActivityPosition(activity);
+    if (!pos) return;
+    const columnTop = cardRect.top - pos.top - 2;
+
+    touchDragStartRef.current = {
+      clientX: touch.clientX,
+      clientY: touch.clientY,
+      activity,
+      dayId,
+      columnTop,
+      cardTop: cardRect.top,
+    };
+    isTouchDraggingRef.current = false;
+
+    touchTimerRef.current = setTimeout(() => {
+      const info = touchDragStartRef.current;
+      if (!info) return;
+      isTouchDraggingRef.current = true;
+      if (navigator.vibrate) navigator.vibrate(50);
+
+      const startMins = timeToMinutes(info.activity.start_time!);
+      const endMins = info.activity.end_time
+        ? timeToMinutes(info.activity.end_time)
+        : startMins + 60;
+
+      dragMovedRef.current = true;
+      dragStartPosRef.current = { x: info.clientX, y: info.clientY };
+
+      setActDrag({
+        type: "move",
+        activityId: info.activity.id,
+        activity: info.activity,
+        dayId: info.dayId,
+        grabOffsetMinutes: ((info.clientY - info.cardTop) / HOUR_HEIGHT) * 60,
+        startMinutes: startMins,
+        endMinutes: endMins,
+        durationMinutes: endMins - startMins,
+        columnTop: info.columnTop,
+      });
+    }, 400);
+  }
+
+  function handleCardTouchMove(e: React.TouchEvent) {
+    if (isTouchDraggingRef.current) return; // handled by global listener
+    if (!touchDragStartRef.current) return;
+    const touch = e.touches[0];
+    const dx = touch.clientX - touchDragStartRef.current.clientX;
+    const dy = touch.clientY - touchDragStartRef.current.clientY;
+    // If user starts scrolling before long-press fires, cancel the timer
+    if (Math.sqrt(dx * dx + dy * dy) > 8) cancelTouchLongPress();
+  }
+
+  function handleCardTouchEnd() {
+    if (!isTouchDraggingRef.current) cancelTouchLongPress();
   }
 
   return (
@@ -1058,11 +1174,15 @@ function CalendarGrid({
                           key={activity.id}
                           data-act
                           onMouseDown={(e) => startActivityMove(e, activity, day.id)}
+                          onTouchStart={(e) => startActivityTouchDown(e, activity, day.id)}
+                          onTouchMove={handleCardTouchMove}
+                          onTouchEnd={handleCardTouchEnd}
+                          onContextMenu={(e) => e.preventDefault()}
                           className={`absolute inset-x-1 rounded-lg border text-left overflow-hidden select-none group ${
                             isDragging
-                              ? "shadow-xl z-30 opacity-90 cursor-grabbing"
+                              ? "shadow-xl z-30 opacity-90 cursor-grabbing scale-[1.02]"
                               : "hover:shadow-md hover:z-10 z-0 cursor-grab"
-                          } ${config.bg} ${config.border} ${config.text}`}
+                          } ${config.bg} ${config.border} ${config.text} transition-transform`}
                           style={{ top: displayTop, height: displayHeight }}
                         >
                           <div className="p-1.5 h-full flex flex-col overflow-hidden pointer-events-none">
