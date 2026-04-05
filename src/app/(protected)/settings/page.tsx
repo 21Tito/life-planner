@@ -6,12 +6,13 @@ export default async function SettingsPage() {
   const supabase = await createClient();
   const { userId } = await getSessionIds(supabase);
 
-  // Run all independent queries in parallel
+  // All queries run in parallel. The members query joins profiles inline
+  // so there's no sequential second roundtrip to fetch member names/avatars.
   const [{ data: membersRaw }, { data: invite }, { data: ownMembership }] =
     await Promise.all([
       supabase
         .from("household_members")
-        .select("member_id, created_at")
+        .select("member_id, created_at, profiles!member_id(full_name, avatar_url)")
         .eq("owner_id", userId),
       supabase
         .from("household_invites")
@@ -25,18 +26,8 @@ export default async function SettingsPage() {
         .maybeSingle(),
     ]);
 
-  // Fetch member profiles (depends on membersRaw)
-  const memberIds = (membersRaw ?? []).map((m) => m.member_id);
-  const { data: profiles } =
-    memberIds.length > 0
-      ? await supabase
-          .from("profiles")
-          .select("id, full_name, avatar_url")
-          .in("id", memberIds)
-      : { data: [] };
-
   const members = (membersRaw ?? []).map((m) => {
-    const profile = profiles?.find((p) => p.id === m.member_id);
+    const profile = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles;
     return {
       id: m.member_id,
       name: profile?.full_name ?? "Unknown",
