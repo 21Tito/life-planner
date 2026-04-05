@@ -5,6 +5,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useOwnerId } from "@/lib/household-context";
 import type { TripDay, TripActivity, ActivityCategory } from "@/types";
+import { PlacesInput } from "@/components/ui/places-input";
 
 // ─── Category config ──────────────────────────────────────────────────────────
 
@@ -402,11 +403,17 @@ function ActivityEditorModal({
               Location{" "}
               <span className="text-gray-400 font-normal">(optional)</span>
             </label>
-            <input
-              type="text"
-              placeholder="Where is this?"
+            <PlacesInput
               value={form.location}
-              onChange={(e) => setForm({ ...form, location: e.target.value })}
+              onChange={(location, mapsUrl) => {
+                setForm((f) => ({
+                  ...f,
+                  location,
+                  // Auto-fill link with Maps URL only if link is currently empty
+                  ...(mapsUrl && !f.link ? { link: mapsUrl } : {}),
+                }));
+              }}
+              placeholder="Where is this?"
               className="w-full h-10 px-3 rounded-lg border border-gray-200 text-base focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-600)]/30 focus:border-[var(--color-brand-600)]"
             />
           </div>
