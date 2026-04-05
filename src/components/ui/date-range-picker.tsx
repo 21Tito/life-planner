@@ -92,7 +92,6 @@ export function DateRangePicker({ value, onChange, placeholder = "Select dates" 
                 setOpen(false);
               }
             }}
-            disabled={{ before: new Date() }}
             showOutsideDays
             classNames={{
               root: "rdp-custom",
