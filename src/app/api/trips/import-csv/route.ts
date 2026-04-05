@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { getOwnerId } from "@/lib/get-owner-id";
+import { getSessionIds } from "@/lib/get-owner-id";
 import { NextResponse } from "next/server";
 import type { ActivityCategory } from "@/types";
 
@@ -225,15 +225,7 @@ function parseDateStr(dateStr: string): string | null {
 export async function POST(request: Request) {
   try {
     const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const ownerId = await getOwnerId(supabase, user.id);
+    const { ownerId } = await getSessionIds(supabase);
 
     const { csv, title, destination } = await request.json();
 

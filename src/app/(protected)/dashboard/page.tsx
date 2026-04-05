@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { getSessionIds } from "@/lib/get-owner-id";
 import Link from "next/link";
 import { StatCard } from "@/components/ui/stat-card";
 import { Icons } from "@/components/ui/icons";
@@ -6,21 +7,19 @@ import { Card, CardContent } from "@/components/ui/card";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { ownerId } = await getSessionIds(supabase);
 
   const [{ data: mealPlans }, { data: trips }] = await Promise.all([
     supabase
       .from("meal_plans")
       .select("*")
-      .eq("user_id", user!.id)
+      .eq("user_id", ownerId)
       .order("created_at", { ascending: false })
       .limit(3),
     supabase
       .from("trips")
       .select("*")
-      .eq("user_id", user!.id)
+      .eq("user_id", ownerId)
       .order("created_at", { ascending: false })
       .limit(3),
   ]);

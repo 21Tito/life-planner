@@ -1,17 +1,12 @@
 import { createClient } from "@/lib/supabase/server";
+import { getSessionIds } from "@/lib/get-owner-id";
 import { generateMealPlan } from "@/lib/claude";
 import { NextResponse } from "next/server";
 
 export async function POST(request: Request) {
   try {
     const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const { ownerId } = await getSessionIds(supabase);
 
     const body = await request.json();
     const { pantry_items, preferences, days = 7 } = body;
@@ -29,7 +24,7 @@ export async function POST(request: Request) {
     const { data: mealPlan, error: planError } = await supabase
       .from("meal_plans")
       .insert({
-        user_id: user.id,
+        user_id: ownerId,
         title: `Week of ${monday.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`,
         week_start: weekStart,
         preferences,
@@ -43,7 +38,7 @@ export async function POST(request: Request) {
     const mealsToInsert = plan.meals.map(
       (meal: { day_of_week: number; meal_type: string; title: string; description: string; recipe: object }) => ({
         meal_plan_id: mealPlan.id,
-        user_id: user.id,
+        user_id: ownerId,
         day_of_week: meal.day_of_week,
         meal_type: meal.meal_type,
         title: meal.title,
@@ -63,7 +58,7 @@ export async function POST(request: Request) {
       const groceryToInsert = plan.grocery_list.map(
         (item: { name: string; quantity: string; category: string }) => ({
           meal_plan_id: mealPlan.id,
-          user_id: user.id,
+          user_id: ownerId,
           name: item.name,
           quantity: item.quantity,
           category: item.category,

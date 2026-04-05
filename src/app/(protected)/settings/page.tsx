@@ -1,19 +1,31 @@
 import { createClient } from "@/lib/supabase/server";
+import { getSessionIds } from "@/lib/get-owner-id";
 import { SettingsClient } from "./settings-client";
 
 export default async function SettingsPage() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { userId } = await getSessionIds(supabase);
 
-  // Fetch current members of this user's household
-  const { data: membersRaw } = await supabase
-    .from("household_members")
-    .select("member_id, created_at")
-    .eq("owner_id", user!.id);
+  // Run all independent queries in parallel
+  const [{ data: membersRaw }, { data: invite }, { data: ownMembership }] =
+    await Promise.all([
+      supabase
+        .from("household_members")
+        .select("member_id, created_at")
+        .eq("owner_id", userId),
+      supabase
+        .from("household_invites")
+        .select("token")
+        .eq("owner_id", userId)
+        .single(),
+      supabase
+        .from("household_members")
+        .select("owner_id")
+        .eq("member_id", userId)
+        .maybeSingle(),
+    ]);
 
-  // Fetch member profiles
+  // Fetch member profiles (depends on membersRaw)
   const memberIds = (membersRaw ?? []).map((m) => m.member_id);
   const { data: profiles } =
     memberIds.length > 0
@@ -22,20 +34,6 @@ export default async function SettingsPage() {
           .select("id, full_name, avatar_url")
           .in("id", memberIds)
       : { data: [] };
-
-  // Fetch the active invite token (if any)
-  const { data: invite } = await supabase
-    .from("household_invites")
-    .select("token")
-    .eq("owner_id", user!.id)
-    .single();
-
-  // Check if this user is a member of someone else's household
-  const { data: ownMembership } = await supabase
-    .from("household_members")
-    .select("owner_id")
-    .eq("member_id", user!.id)
-    .single();
 
   const members = (membersRaw ?? []).map((m) => {
     const profile = profiles?.find((p) => p.id === m.member_id);
