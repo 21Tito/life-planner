@@ -37,7 +37,7 @@ export default async function TripDetailPage({
         <TripCalendarView
           days={tripDays}
           tripId={trip.id}
-          initialTimezone={trip.timezone || "UTC"}
+          initialTimezone={trip.timezone ?? null}
         />
       )}
     </div>

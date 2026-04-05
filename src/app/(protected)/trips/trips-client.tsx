@@ -25,6 +25,7 @@ export function TripsClient({ initialTrips }: Props) {
   const [showForm, setShowForm] = useState(false);
   const [mode, setMode] = useState<CreationMode>("ai");
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [form, setForm] = useState({
     destination: "",
     start_date: "",
@@ -49,6 +50,7 @@ export function TripsClient({ initialTrips }: Props) {
   async function handleAIGenerate() {
     if (!form.destination || !form.start_date || !form.end_date) return;
     setSubmitting(true);
+    setSubmitError(null);
 
     try {
       const res = await fetch("/api/trips/generate", {
@@ -61,9 +63,11 @@ export function TripsClient({ initialTrips }: Props) {
         setTrips((prev) => [data.trip, ...prev]);
         setShowForm(false);
         resetForm();
+        return;
       }
-    } catch (err) {
-      console.error("Trip generation failed:", err);
+      setSubmitError(data.error ?? "Failed to generate itinerary");
+    } catch {
+      setSubmitError("Something went wrong. Please try again.");
     } finally {
       setSubmitting(false);
     }
@@ -72,6 +76,7 @@ export function TripsClient({ initialTrips }: Props) {
   async function handleManualCreate() {
     if (!form.destination || !form.start_date || !form.end_date) return;
     setSubmitting(true);
+    setSubmitError(null);
 
     try {
       const res = await fetch("/api/trips/create-manual", {
@@ -87,11 +92,15 @@ export function TripsClient({ initialTrips }: Props) {
       });
       const data = await res.json();
       if (data.trip) {
-        // Navigate to the trip in edit mode
+        // Navigate to the trip — keep submitting=true while navigating
+        // so the button stays in loading state until the new page loads.
         router.push(`/trips/${data.trip.id}?edit=true`);
+        return;
       }
-    } catch (err) {
-      console.error("Manual trip creation failed:", err);
+      setSubmitError(data.error ?? "Failed to create trip");
+    } catch {
+      setSubmitError("Something went wrong. Please try again.");
+    } finally {
       setSubmitting(false);
     }
   }
@@ -99,6 +108,7 @@ export function TripsClient({ initialTrips }: Props) {
   async function handleCSVImport() {
     if (!csvText.trim()) return;
     setSubmitting(true);
+    setSubmitError(null);
 
     try {
       const res = await fetch("/api/trips/import-csv", {
@@ -112,14 +122,15 @@ export function TripsClient({ initialTrips }: Props) {
       });
       const data = await res.json();
       if (data.error) {
-        console.error("Import failed:", data.error);
+        setSubmitError(data.error);
         return;
       }
       if (data.trip) {
         router.push(`/trips/${data.trip.id}`);
+        return;
       }
-    } catch (err) {
-      console.error("CSV import failed:", err);
+    } catch {
+      setSubmitError("Something went wrong. Please try again.");
     } finally {
       setSubmitting(false);
     }
@@ -395,6 +406,12 @@ export function TripsClient({ initialTrips }: Props) {
                   />
                 </div>
               </div>
+            )}
+
+            {submitError && (
+              <p className="mt-4 text-sm text-red-600 rounded-lg border border-red-200 bg-red-50 px-3 py-2">
+                {submitError}
+              </p>
             )}
 
             <div className="mt-5 lg:mt-6">

@@ -695,6 +695,63 @@ function InlineEditCell({
   );
 }
 
+// ─── Timezone selector ───────────────────────────────────────────────────────
+
+function TimezoneSelector({
+  value,
+  onChange,
+}: {
+  value: string | null;
+  onChange: (tz: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const isSet = value !== null;
+  const label = isSet
+    ? (COMMON_TIMEZONES.find((tz) => tz.value === value)?.label ?? value)
+    : null;
+
+  if (!isSet && !open) {
+    return (
+      <button
+        onClick={() => setOpen(true)}
+        className="text-xs border border-dashed border-[var(--color-border)] rounded-lg px-2.5 py-1.5 text-[var(--color-text-muted)] hover:border-[var(--color-brand-600)] hover:text-[var(--color-brand-600)] transition-colors shrink-0 whitespace-nowrap"
+      >
+        Set timezone
+      </button>
+    );
+  }
+
+  if (isSet && !open) {
+    return (
+      <button
+        onClick={() => setOpen(true)}
+        className="text-xs border border-[var(--color-border)] rounded-lg px-2.5 py-1.5 bg-white text-[var(--color-text-muted)] hover:border-[var(--color-brand-600)] hover:text-[var(--color-text)] transition-colors shrink-0 flex items-center gap-1.5 max-w-[160px]"
+        title="Click to change timezone"
+      >
+        <span className="truncate">{label!}</span>
+        <span className="opacity-40 shrink-0">✎</span>
+      </button>
+    );
+  }
+
+  return (
+    <select
+      autoFocus
+      value={value ?? "UTC"}
+      onChange={(e) => {
+        onChange(e.target.value);
+        setOpen(false);
+      }}
+      onBlur={() => setOpen(false)}
+      className="text-xs border border-[var(--color-brand-600)] rounded-lg px-2 py-1.5 bg-white text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-600)]/30 max-w-[160px] shrink-0"
+    >
+      {COMMON_TIMEZONES.map((tz) => (
+        <option key={tz.value} value={tz.value}>{tz.label}</option>
+      ))}
+    </select>
+  );
+}
+
 // ─── Calendar grid ────────────────────────────────────────────────────────────
 
 function CalendarGrid({
@@ -1236,13 +1293,14 @@ export function TripCalendarView({
 }: {
   days: DayWithActivities[];
   tripId: string;
-  initialTimezone: string;
+  initialTimezone: string | null;
 }) {
   const supabase = createClient();
   const userId = useOwnerId();
 
   const [days, setDays] = useState<DayWithActivities[]>(initialDays);
-  const [timezone, setTimezone] = useState(initialTimezone || "UTC");
+  // null = never set; non-null = explicitly chosen (including "UTC")
+  const [timezone, setTimezone] = useState<string | null>(initialTimezone);
   const [view, setView] = useState<"calendar" | "list">("calendar");
   const [editorState, setEditorState] = useState<EditorState | null>(null);
   const [saving, setSaving] = useState(false);
@@ -1326,7 +1384,7 @@ export function TripCalendarView({
         activity_id: activityId,
         day_date: dayDate,
         gcal_event_id: gcalEventId,
-        timezone,
+        timezone: timezone ?? "UTC",
       }),
     })
       .then((r) => r.json())
@@ -1574,19 +1632,13 @@ export function TripCalendarView({
         <div className="flex-1 sm:hidden" />
 
         {/* Timezone picker */}
-        <select
+        <TimezoneSelector
           value={timezone}
-          onChange={async (e) => {
-            const tz = e.target.value;
+          onChange={async (tz) => {
             setTimezone(tz);
             await supabase.from("trips").update({ timezone: tz }).eq("id", tripId);
           }}
-          className="text-xs border border-[var(--color-border)] rounded-lg px-2 py-1.5 bg-white text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-600)]/30 max-w-[160px]"
-        >
-          {COMMON_TIMEZONES.map((tz) => (
-            <option key={tz.value} value={tz.value}>{tz.label}</option>
-          ))}
-        </select>
+        />
 
         {/* View toggle */}
         <div className="flex items-center rounded-lg border border-[var(--color-border)] overflow-hidden text-sm shrink-0">
