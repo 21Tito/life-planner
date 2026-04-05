@@ -409,26 +409,11 @@ function ActivityEditorModal({
                 setForm((f) => ({
                   ...f,
                   location,
-                  // Auto-fill link with Maps URL only if link is currently empty
-                  ...(mapsUrl && !f.link ? { link: mapsUrl } : {}),
+                  // Set Maps URL when place selected, clear when location cleared
+                  link: mapsUrl !== undefined ? (mapsUrl ?? "") : location ? f.link : "",
                 }));
               }}
               placeholder="Where is this?"
-              className="w-full h-10 px-3 rounded-lg border border-gray-200 text-base focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-600)]/30 focus:border-[var(--color-brand-600)]"
-            />
-          </div>
-
-          {/* Link */}
-          <div>
-            <label className="block text-sm font-medium mb-1.5">
-              Link{" "}
-              <span className="text-gray-400 font-normal">(optional)</span>
-            </label>
-            <input
-              type="url"
-              placeholder="Google Maps link, booking URL, etc."
-              value={form.link}
-              onChange={(e) => setForm({ ...form, link: e.target.value })}
               className="w-full h-10 px-3 rounded-lg border border-gray-200 text-base focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-600)]/30 focus:border-[var(--color-brand-600)]"
             />
           </div>
@@ -1172,7 +1157,7 @@ export function TripCalendarView({
   }
 
   function handleActivityTap(activity: TripActivity, dayId: string) {
-    // If no link, go straight to edit
+    // If no Maps URL, go straight to edit
     if (!activity.booking_url) {
       openEditEditor(activity, dayId);
       return;
@@ -1519,7 +1504,7 @@ export function TripCalendarView({
         />
       )}
 
-      {/* Quick action sheet when tapping an activity with a link */}
+      {/* Quick action sheet when tapping an activity with a location */}
       {tappedActivity && (
         <div
           className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4"
@@ -1550,17 +1535,16 @@ export function TripCalendarView({
                 }}
                 className="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-gray-50 transition-colors text-left"
               >
-                <div className="w-9 h-9 rounded-lg bg-blue-50 flex items-center justify-center flex-shrink-0">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-600">
-                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                    <polyline points="15 3 21 3 21 9" />
-                    <line x1="10" y1="14" x2="21" y2="3" />
+                <div className="w-9 h-9 rounded-lg bg-green-50 flex items-center justify-center flex-shrink-0">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-green-600">
+                    <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
+                    <circle cx="12" cy="9" r="2.5"/>
                   </svg>
                 </div>
                 <div>
-                  <span className="text-sm font-medium">Open Link</span>
+                  <span className="text-sm font-medium">Open in Maps</span>
                   <p className="text-[11px] text-[var(--color-text-muted)] truncate max-w-[200px]">
-                    {tappedActivity.activity.booking_url}
+                    {tappedActivity.activity.location || tappedActivity.activity.booking_url}
                   </p>
                 </div>
               </button>
