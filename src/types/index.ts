@@ -136,6 +136,19 @@ export type ActivityCategory =
   | "rest"
   | "other";
 
+export interface TripHotel {
+  id: string;
+  trip_id: string;
+  user_id: string;
+  name: string;
+  location: string | null;
+  maps_url: string | null;
+  check_in_date: string;
+  check_out_date: string;
+  notes: string | null;
+  created_at: string;
+}
+
 export interface GoogleTokens {
   user_id: string;
   access_token: string;

@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useOwnerId } from "@/lib/household-context";
-import type { TripDay, TripActivity, ActivityCategory } from "@/types";
+import type { TripDay, TripActivity, ActivityCategory, TripHotel } from "@/types";
 import { PlacesInput } from "@/components/ui/places-input";
 
 // ─── Category config ──────────────────────────────────────────────────────────
@@ -772,16 +772,22 @@ function TimezoneSelector({
 
 function CalendarGrid({
   days,
+  hotels,
   onCellClick,
   onActivityEdit,
   onUpdateDayField,
   onActivityTimeUpdate,
+  onHotelClick,
+  onAddHotel,
 }: {
   days: DayWithActivities[];
+  hotels: TripHotel[];
   onCellClick?: (dayId: string, dayDate: string, startHour: number, endHour: number) => void;
   onActivityEdit?: (activity: TripActivity, dayId: string) => void;
   onUpdateDayField?: (dayId: string, field: "title" | "notes", value: string) => void;
   onActivityTimeUpdate?: (activityId: string, dayId: string, startTime: string, endTime: string) => void;
+  onHotelClick?: (hotel: TripHotel) => void;
+  onAddHotel?: (date: string) => void;
 }) {
   // Drag-to-select (create) state
   const [dragState, setDragState] = useState<{
@@ -1129,7 +1135,7 @@ function CalendarGrid({
         </div>
 
         {/* Row 3: Hotel */}
-        <div className="flex border-b border-[var(--color-border)]" style={{ backgroundColor: "rgb(255 247 237 / 0.5)", height: 34 }}>
+        <div className="flex border-b border-[var(--color-border)]" style={{ backgroundColor: "rgb(255 247 237 / 0.5)", height: 38 }}>
           <div
             className="sticky left-0 z-10 border-r border-[var(--color-border)] flex-shrink-0 flex items-center justify-end pr-2"
             style={{ width: TIME_COL_WIDTH, backgroundColor: "rgb(255 247 237 / 0.5)" }}
@@ -1138,19 +1144,61 @@ function CalendarGrid({
               Hotel
             </span>
           </div>
-          {days.map((day) => (
-            <div
-              key={day.id}
-              className="flex-1 border-r border-[var(--color-border)] last:border-r-0" style={{ minWidth: 100 }}
-            >
-              <InlineEditCell
-                value={day.notes}
-                placeholder="Add hotel or paste Maps link…"
-                onSave={(v) => onUpdateDayField?.(day.id, "notes", v)}
-                enableUrlResolve
-              />
-            </div>
-          ))}
+          {days.map((day, idx) => {
+            const hotel = hotels.find(
+              (h) => h.check_in_date <= day.date && h.check_out_date >= day.date
+            );
+            const isStart = hotel?.check_in_date === day.date;
+            const nextDay = days[idx + 1];
+            const nextHasSameHotel =
+              hotel && nextDay && nextDay.date <= hotel.check_out_date;
+            return (
+              <div
+                key={day.id}
+                className="flex-1 last:border-r-0 relative flex items-center overflow-hidden"
+                style={{
+                  minWidth: 100,
+                  borderRight: nextHasSameHotel
+                    ? "1px solid transparent"
+                    : "1px solid var(--color-border)",
+                }}
+              >
+                {hotel ? (
+                  <button
+                    onClick={() => onHotelClick?.(hotel)}
+                    className="absolute inset-0 flex items-center px-2 gap-1.5 bg-orange-100 hover:bg-orange-200 transition-colors"
+                    title={hotel.name}
+                  >
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-orange-500 shrink-0">
+                      <path d="M3 22V7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v15" /><path d="M6 22v-4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v4" /><rect width="4" height="4" x="10" y="11" />
+                    </svg>
+                    <span className="text-xs font-medium text-orange-800 truncate">{hotel.name}</span>
+                    {hotel.maps_url && isStart && (
+                      <a
+                        href={hotel.maps_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="ml-auto shrink-0 text-orange-400 hover:text-orange-600 transition-colors"
+                        title="Open in Maps"
+                      >
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" /><circle cx="12" cy="10" r="3" />
+                        </svg>
+                      </a>
+                    )}
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => onAddHotel?.(day.date)}
+                    className="w-full h-full flex items-center justify-center text-[10px] text-orange-300 hover:text-orange-500 hover:bg-orange-50 transition-colors"
+                  >
+                    + hotel
+                  </button>
+                )}
+              </div>
+            );
+          })}
         </div>
 
         {/* ══ SCROLLABLE BODY ══ */}
@@ -1300,16 +1348,209 @@ function CalendarGrid({
   );
 }
 
+// ─── Hotel Modal ──────────────────────────────────────────────────────────────
+
+type HotelFormData = {
+  name: string;
+  location: string;
+  maps_url: string;
+  check_in_date: string;
+  check_out_date: string;
+  notes: string;
+};
+
+function HotelModal({
+  hotel,
+  prefillDate,
+  tripDates,
+  saving,
+  onClose,
+  onSave,
+  onDelete,
+}: {
+  hotel: TripHotel | null;
+  prefillDate?: string;
+  tripDates: string[];
+  saving: boolean;
+  onClose: () => void;
+  onSave: (form: HotelFormData) => void;
+  onDelete: () => void;
+}) {
+  const isEditing = !!hotel;
+  const defaultDate = prefillDate ?? tripDates[0] ?? "";
+  const [form, setForm] = useState<HotelFormData>({
+    name: hotel?.name ?? "",
+    location: hotel?.location ?? "",
+    maps_url: hotel?.maps_url ?? "",
+    check_in_date: hotel?.check_in_date ?? defaultDate,
+    check_out_date: hotel?.check_out_date ?? defaultDate,
+    notes: hotel?.notes ?? "",
+  });
+
+  const dateLabel = (d: string) =>
+    new Date(d + "T00:00:00").toLocaleDateString("en-US", {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+    });
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4"
+      style={{ backgroundColor: "rgba(0,0,0,0.45)" }}
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div className="bg-white sm:rounded-2xl rounded-t-2xl shadow-2xl w-full sm:max-w-md flex flex-col max-h-[92vh] sm:max-h-[85vh]">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
+          <h2 className="font-semibold text-base">
+            {isEditing ? "Edit Hotel" : "Add Hotel"}
+          </h2>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 transition-colors w-7 h-7 flex items-center justify-center rounded-lg hover:bg-gray-100"
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+          {/* Name */}
+          <div>
+            <label className="block text-sm font-medium mb-1.5">
+              Hotel name <span className="text-red-400">*</span>
+            </label>
+            <input
+              type="text"
+              placeholder="e.g. Bairro Alto Hotel"
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              className="w-full h-10 px-3 rounded-lg border border-gray-200 text-base focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-600)]/30 focus:border-[var(--color-brand-600)]"
+            />
+          </div>
+
+          {/* Location */}
+          <div>
+            <label className="block text-sm font-medium mb-1.5">
+              Location <span className="text-gray-400 font-normal">(optional)</span>
+            </label>
+            <PlacesInput
+              value={form.location}
+              onChange={(location, mapsUrl) => {
+                setForm((f) => ({
+                  ...f,
+                  location,
+                  maps_url: mapsUrl !== undefined ? (mapsUrl ?? "") : location ? f.maps_url : "",
+                }));
+              }}
+              placeholder="Search for hotel address…"
+              className="w-full h-10 px-3 rounded-lg border border-gray-200 text-base focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-600)]/30 focus:border-[var(--color-brand-600)]"
+            />
+          </div>
+
+          {/* Date range */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium mb-1.5">Check-in</label>
+              <select
+                value={form.check_in_date}
+                onChange={(e) => {
+                  const newIn = e.target.value;
+                  setForm((f) => ({
+                    ...f,
+                    check_in_date: newIn,
+                    // If check-out is before new check-in, move it forward
+                    check_out_date: f.check_out_date < newIn ? newIn : f.check_out_date,
+                  }));
+                }}
+                className="w-full h-10 px-3 rounded-lg border border-gray-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-600)]/30 focus:border-[var(--color-brand-600)]"
+              >
+                {tripDates.map((d) => (
+                  <option key={d} value={d}>{dateLabel(d)}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1.5">Check-out</label>
+              <select
+                value={form.check_out_date}
+                onChange={(e) => setForm({ ...form, check_out_date: e.target.value })}
+                className="w-full h-10 px-3 rounded-lg border border-gray-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-600)]/30 focus:border-[var(--color-brand-600)]"
+              >
+                {tripDates.filter((d) => d >= form.check_in_date).map((d) => (
+                  <option key={d} value={d}>{dateLabel(d)}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Notes */}
+          <div>
+            <label className="block text-sm font-medium mb-1.5">
+              Notes <span className="text-gray-400 font-normal">(optional)</span>
+            </label>
+            <textarea
+              rows={2}
+              placeholder="Confirmation number, room type…"
+              value={form.notes}
+              onChange={(e) => setForm({ ...form, notes: e.target.value })}
+              className="w-full px-3 py-2 rounded-lg border border-gray-200 text-base resize-none focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-600)]/30 focus:border-[var(--color-brand-600)]"
+            />
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-between px-5 py-4 border-t border-gray-100 gap-3 flex-shrink-0">
+          {isEditing ? (
+            <button
+              onClick={onDelete}
+              disabled={saving}
+              className="text-sm text-red-500 hover:text-red-700 transition-colors disabled:opacity-40"
+            >
+              Delete hotel
+            </button>
+          ) : (
+            <span />
+          )}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onClose}
+              disabled={saving}
+              className="px-4 py-2 text-sm rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-40"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => onSave(form)}
+              disabled={saving || !form.name.trim()}
+              className="px-4 py-2 text-sm rounded-lg bg-[var(--color-brand-600)] text-white font-medium hover:opacity-90 transition-opacity disabled:opacity-40"
+            >
+              {saving ? "Saving…" : isEditing ? "Save changes" : "Add hotel"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main export ──────────────────────────────────────────────────────────────
 
 export function TripCalendarView({
   days: initialDays,
   tripId,
   initialTimezone,
+  initialHotels,
+  tripStartDate,
+  tripEndDate,
 }: {
   days: DayWithActivities[];
   tripId: string;
   initialTimezone: string | null;
+  initialHotels: TripHotel[];
+  tripStartDate: string;
+  tripEndDate: string;
 }) {
   const supabase = createClient();
   const userId = useOwnerId();
@@ -1326,6 +1567,86 @@ export function TripCalendarView({
     activity: TripActivity;
     dayId: string;
   } | null>(null);
+
+  // ── Hotels ──
+  const [hotels, setHotels] = useState<TripHotel[]>(initialHotels);
+  const [hotelModal, setHotelModal] = useState<{
+    open: boolean;
+    hotel: TripHotel | null;
+    prefillDate?: string;
+  }>({ open: false, hotel: null });
+  const [hotelSaving, setHotelSaving] = useState(false);
+  const [tappedHotel, setTappedHotel] = useState<TripHotel | null>(null);
+
+  // All trip dates as "YYYY-MM-DD" strings for dropdowns
+  const tripDates: string[] = (() => {
+    const dates: string[] = [];
+    const cur = new Date(tripStartDate + "T00:00:00");
+    const end = new Date(tripEndDate + "T00:00:00");
+    while (cur <= end) {
+      dates.push(cur.toISOString().split("T")[0]);
+      cur.setDate(cur.getDate() + 1);
+    }
+    return dates;
+  })();
+
+  async function handleHotelSave(form: HotelFormData) {
+    setHotelSaving(true);
+    try {
+      if (hotelModal.hotel) {
+        // Update
+        const res = await fetch("/api/trips/hotels/update", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ hotelId: hotelModal.hotel.id, ...form }),
+        });
+        if ((await res.json()).ok) {
+          setHotels((prev) =>
+            prev.map((h) =>
+              h.id === hotelModal.hotel!.id ? { ...h, ...form } : h
+            )
+          );
+          setHotelModal({ open: false, hotel: null });
+        }
+      } else {
+        // Create
+        const res = await fetch("/api/trips/hotels/create", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tripId, ...form }),
+        });
+        const data = await res.json();
+        if (data.hotel) {
+          setHotels((prev) =>
+            [...prev, data.hotel].sort((a, b) =>
+              a.check_in_date.localeCompare(b.check_in_date)
+            )
+          );
+          setHotelModal({ open: false, hotel: null });
+        }
+      }
+    } finally {
+      setHotelSaving(false);
+    }
+  }
+
+  async function handleHotelDelete() {
+    if (!hotelModal.hotel) return;
+    setHotelSaving(true);
+    try {
+      const res = await fetch("/api/trips/hotels/delete", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ hotelId: hotelModal.hotel.id }),
+      });
+      if ((await res.json()).ok) {
+        setHotels((prev) => prev.filter((h) => h.id !== hotelModal.hotel!.id));
+        setHotelModal({ open: false, hotel: null });
+      }
+    } finally {
+      setHotelSaving(false);
+    }
+  }
 
   function hourToTimeStr(hour: number): string {
     const h = hour >= 24 ? 0 : hour;
@@ -1778,6 +2099,73 @@ export function TripCalendarView({
         </div>
       )}
 
+      {/* Hotel quick-action sheet */}
+      {tappedHotel && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4"
+          style={{ backgroundColor: "rgba(0,0,0,0.4)" }}
+          onClick={() => setTappedHotel(null)}
+        >
+          <div
+            className="bg-white sm:rounded-2xl rounded-t-2xl shadow-2xl w-full sm:max-w-xs overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-5 pt-4 pb-2">
+              <h3 className="font-semibold text-sm truncate">{tappedHotel.name}</h3>
+              <p className="text-xs text-[var(--color-text-muted)] mt-0.5">
+                {new Date(tappedHotel.check_in_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                {" – "}
+                {new Date(tappedHotel.check_out_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+              </p>
+            </div>
+            <div className="px-3 pb-3 space-y-1">
+              {tappedHotel.maps_url && (
+                <button
+                  onClick={() => {
+                    window.open(tappedHotel.maps_url!, "_blank");
+                    setTappedHotel(null);
+                  }}
+                  className="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-gray-50 transition-colors text-left"
+                >
+                  <div className="w-9 h-9 rounded-lg bg-green-50 flex items-center justify-center flex-shrink-0">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-green-600">
+                      <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
+                      <circle cx="12" cy="9" r="2.5"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <span className="text-sm font-medium">Open in Maps</span>
+                    <p className="text-[11px] text-[var(--color-text-muted)] truncate max-w-[200px]">
+                      {tappedHotel.location || tappedHotel.maps_url}
+                    </p>
+                  </div>
+                </button>
+              )}
+              <button
+                onClick={() => {
+                  setTappedHotel(null);
+                  setHotelModal({ open: true, hotel: tappedHotel });
+                }}
+                className="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-gray-50 transition-colors text-left"
+              >
+                <div className="w-9 h-9 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-600">
+                    <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                  </svg>
+                </div>
+                <span className="text-sm font-medium">Edit Hotel</span>
+              </button>
+            </div>
+            <button
+              onClick={() => setTappedHotel(null)}
+              className="w-full py-3 text-sm text-[var(--color-text-muted)] border-t border-gray-100 hover:bg-gray-50 transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Pagination controls */}
       {view === "calendar" && totalPages > 1 && (
         <div className="flex items-center justify-between gap-3 bg-gray-50 rounded-xl px-4 py-2 border border-[var(--color-border)]">
@@ -1805,13 +2193,29 @@ export function TripCalendarView({
       {view === "calendar" ? (
         <CalendarGrid
           days={pagedDays}
+          hotels={hotels}
           onCellClick={openAddEditor}
           onActivityEdit={handleActivityTap}
           onUpdateDayField={handleUpdateDayField}
           onActivityTimeUpdate={handleActivityTimeUpdate}
+          onHotelClick={(hotel) => setTappedHotel(hotel)}
+          onAddHotel={(date) => setHotelModal({ open: true, hotel: null, prefillDate: date })}
         />
       ) : (
         <ListView days={days} />
+      )}
+
+      {/* Hotel modal */}
+      {hotelModal.open && (
+        <HotelModal
+          hotel={hotelModal.hotel}
+          prefillDate={hotelModal.prefillDate}
+          tripDates={tripDates}
+          saving={hotelSaving}
+          onClose={() => setHotelModal({ open: false, hotel: null })}
+          onSave={handleHotelSave}
+          onDelete={handleHotelDelete}
+        />
       )}
     </div>
   );

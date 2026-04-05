@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
-import type { TripDay, TripActivity } from "@/types";
+import type { TripDay, TripActivity, TripHotel } from "@/types";
 import { TripCalendarView } from "@/components/ui/trip-calendar-view";
 
 export default async function TripDetailPage({
@@ -19,13 +19,21 @@ export default async function TripDetailPage({
 
   if (!trip) notFound();
 
-  const { data: days } = await supabase
-    .from("trip_days")
-    .select("*, trip_activities(*)")
-    .eq("trip_id", id)
-    .order("day_number");
+  const [{ data: days }, { data: hotels }] = await Promise.all([
+    supabase
+      .from("trip_days")
+      .select("*, trip_activities(*)")
+      .eq("trip_id", id)
+      .order("day_number"),
+    supabase
+      .from("trip_hotels")
+      .select("*")
+      .eq("trip_id", id)
+      .order("check_in_date"),
+  ]);
 
   const tripDays: (TripDay & { trip_activities: TripActivity[] })[] = days || [];
+  const tripHotels: TripHotel[] = hotels || [];
 
   return (
     <div className="w-full min-w-0 overflow-hidden -mb-24 lg:mb-0">
@@ -38,6 +46,9 @@ export default async function TripDetailPage({
           days={tripDays}
           tripId={trip.id}
           initialTimezone={trip.timezone ?? null}
+          initialHotels={tripHotels}
+          tripStartDate={trip.start_date}
+          tripEndDate={trip.end_date}
         />
       )}
     </div>
