@@ -8,6 +8,7 @@ import type { Trip } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Icons } from "@/components/ui/icons";
@@ -16,65 +17,37 @@ interface Props {
   initialTrips: Trip[];
 }
 
-type CreationMode = "ai" | "manual" | "csv";
+type CreationMode = "manual" | "csv";
 
 export function TripsClient({ initialTrips }: Props) {
   const supabase = createClient();
   const router = useRouter();
   const [trips, setTrips] = useState<Trip[]>(initialTrips);
   const [showForm, setShowForm] = useState(false);
-  const [mode, setMode] = useState<CreationMode>("ai");
+  const [mode, setMode] = useState<CreationMode>("manual");
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [form, setForm] = useState({
     destination: "",
-    start_date: "",
-    end_date: "",
-    interests: "",
-    budget: "",
     notes: "",
+  });
+  const [dateRange, setDateRange] = useState<{ from: Date | undefined; to: Date | undefined }>({
+    from: undefined,
+    to: undefined,
   });
   const [csvText, setCsvText] = useState("");
 
-  function resetForm() {
-    setForm({
-      destination: "",
-      start_date: "",
-      end_date: "",
-      interests: "",
-      budget: "",
-      notes: "",
-    });
+  function toDateStr(d: Date): string {
+    return d.toISOString().split("T")[0];
   }
 
-  async function handleAIGenerate() {
-    if (!form.destination || !form.start_date || !form.end_date) return;
-    setSubmitting(true);
-    setSubmitError(null);
-
-    try {
-      const res = await fetch("/api/trips/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
-      });
-      const data = await res.json();
-      if (data.trip) {
-        setTrips((prev) => [data.trip, ...prev]);
-        setShowForm(false);
-        resetForm();
-        return;
-      }
-      setSubmitError(data.error ?? "Failed to generate itinerary");
-    } catch {
-      setSubmitError("Something went wrong. Please try again.");
-    } finally {
-      setSubmitting(false);
-    }
+  function resetForm() {
+    setForm({ destination: "", notes: "" });
+    setDateRange({ from: undefined, to: undefined });
   }
 
   async function handleManualCreate() {
-    if (!form.destination || !form.start_date || !form.end_date) return;
+    if (!form.destination || !dateRange.from || !dateRange.to) return;
     setSubmitting(true);
     setSubmitError(null);
 
@@ -84,9 +57,8 @@ export function TripsClient({ initialTrips }: Props) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           destination: form.destination,
-          start_date: form.start_date,
-          end_date: form.end_date,
-          budget: form.budget || undefined,
+          start_date: toDateStr(dateRange.from),
+          end_date: toDateStr(dateRange.to),
           notes: form.notes || undefined,
         }),
       });
@@ -168,7 +140,7 @@ export function TripsClient({ initialTrips }: Props) {
   }
 
   const canSubmit =
-    !!form.destination && !!form.start_date && !!form.end_date && !submitting;
+    !!form.destination && !!dateRange.from && !!dateRange.to && !submitting;
 
   return (
     <div className="max-w-4xl">
@@ -182,7 +154,7 @@ export function TripsClient({ initialTrips }: Props) {
             Trip Planner
           </h1>
           <p className="text-sm text-muted-foreground">
-            Plan your next adventure with AI or build your own itinerary.
+            Plan your next adventure with a day-by-day itinerary.
           </p>
         </div>
         <Button
@@ -215,19 +187,8 @@ export function TripsClient({ initialTrips }: Props) {
             {/* Mode toggle */}
             <div className="flex rounded-xl border border-[var(--color-border)] overflow-hidden mb-5 text-sm w-fit">
               <button
-                onClick={() => setMode("ai")}
-                className={`px-4 py-2 flex items-center gap-1.5 transition-colors ${
-                  mode === "ai"
-                    ? "bg-[var(--color-brand-600)] text-white font-medium"
-                    : "text-[var(--color-text-muted)] hover:bg-gray-50"
-                }`}
-              >
-                <span>{Icons.sparkle}</span>
-                Generate with AI
-              </button>
-              <button
                 onClick={() => setMode("manual")}
-                className={`px-4 py-2 flex items-center gap-1.5 transition-colors border-l border-[var(--color-border)] ${
+                className={`px-4 py-2 flex items-center gap-1.5 transition-colors ${
                   mode === "manual"
                     ? "bg-[var(--color-brand-600)] text-white font-medium"
                     : "text-[var(--color-text-muted)] hover:bg-gray-50"
@@ -327,69 +288,18 @@ export function TripsClient({ initialTrips }: Props) {
                     className="h-10 text-sm"
                   />
                 </div>
-                <div>
+                <div className="sm:col-span-2">
                   <label className="block text-sm font-medium mb-1.5">
-                    Start Date
+                    Dates
                   </label>
-                  <Input
-                    type="date"
-                    value={form.start_date}
-                    onChange={(e) =>
-                      setForm({ ...form, start_date: e.target.value })
-                    }
-                    className="h-10 text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1.5">
-                    End Date
-                  </label>
-                  <Input
-                    type="date"
-                    value={form.end_date}
-                    onChange={(e) =>
-                      setForm({ ...form, end_date: e.target.value })
-                    }
-                    className="h-10 text-sm"
+                  <DateRangePicker
+                    value={dateRange}
+                    onChange={setDateRange}
+                    placeholder="Pick start & end date"
                   />
                 </div>
 
-                {mode === "ai" && (
-                  <div className="sm:col-span-2">
-                    <label className="block text-sm font-medium mb-1.5">
-                      Interests{" "}
-                      <span className="text-muted-foreground font-normal">
-                        (optional)
-                      </span>
-                    </label>
-                    <Input
-                      placeholder="e.g. food, history, street art, beaches"
-                      value={form.interests}
-                      onChange={(e) =>
-                        setForm({ ...form, interests: e.target.value })
-                      }
-                      className="h-10 text-sm"
-                    />
-                  </div>
-                )}
-
-                <div>
-                  <label className="block text-sm font-medium mb-1.5">
-                    Budget{" "}
-                    <span className="text-muted-foreground font-normal">
-                      (optional)
-                    </span>
-                  </label>
-                  <Input
-                    placeholder="e.g. $2000"
-                    value={form.budget}
-                    onChange={(e) =>
-                      setForm({ ...form, budget: e.target.value })
-                    }
-                    className="h-10 text-sm"
-                  />
-                </div>
-                <div>
+                <div className="sm:col-span-2">
                   <label className="block text-sm font-medium mb-1.5">
                     Notes{" "}
                     <span className="text-muted-foreground font-normal">
@@ -415,16 +325,7 @@ export function TripsClient({ initialTrips }: Props) {
             )}
 
             <div className="mt-5 lg:mt-6">
-              {mode === "ai" ? (
-                <Button
-                  onClick={handleAIGenerate}
-                  disabled={!canSubmit}
-                  className="w-full sm:w-auto rounded-full px-8 h-11 gap-2"
-                >
-                  <span>{Icons.sparkle}</span>
-                  {submitting ? "Generating itinerary..." : "Generate Itinerary"}
-                </Button>
-              ) : mode === "csv" ? (
+              {mode === "csv" ? (
                 <Button
                   onClick={handleCSVImport}
                   disabled={!csvText.trim() || submitting}
