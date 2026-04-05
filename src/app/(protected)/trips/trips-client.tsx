@@ -1,7 +1,7 @@
 "use client";
 
 import { createClient } from "@/lib/supabase/client";
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { Trip } from "@/types";
@@ -122,6 +122,63 @@ export function TripsClient({ initialTrips }: Props) {
     const { error } = await supabase.from("trips").delete().eq("id", tripId);
     if (!error) {
       setTrips((prev) => prev.filter((t) => t.id !== tripId));
+    }
+  }
+
+  // ── Edit modal ──────────────────────────────────────────────────────────────
+
+  const [editingTrip, setEditingTrip] = useState<Trip | null>(null);
+  const [deletingTrip, setDeletingTrip] = useState<Trip | null>(null);
+  const [editForm, setEditForm] = useState({ destination: "", notes: "" });
+  const [editDateRange, setEditDateRange] = useState<{ from: Date | undefined; to: Date | undefined }>({ from: undefined, to: undefined });
+  const [editSaving, setEditSaving] = useState(false);
+
+  function openEditModal(trip: Trip) {
+    setEditingTrip(trip);
+    setEditForm({ destination: trip.destination, notes: trip.notes ?? "" });
+    setEditDateRange({
+      from: new Date(trip.start_date + "T00:00:00"),
+      to: new Date(trip.end_date + "T00:00:00"),
+    });
+  }
+
+  async function handleEditSave() {
+    if (!editingTrip || !editForm.destination || !editDateRange.from || !editDateRange.to) return;
+    setEditSaving(true);
+    const start_date = toDateStr(editDateRange.from);
+    const end_date = toDateStr(editDateRange.to);
+    try {
+      const res = await fetch("/api/trips/update", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tripId: editingTrip.id,
+          destination: editForm.destination.trim(),
+          start_date,
+          end_date,
+          notes: editForm.notes.trim() || null,
+        }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setTrips((prev) =>
+          prev.map((t) =>
+            t.id === editingTrip.id
+              ? {
+                  ...t,
+                  destination: editForm.destination.trim(),
+                  title: `${editForm.destination.trim()} Trip`,
+                  start_date,
+                  end_date,
+                  notes: editForm.notes.trim() || null,
+                }
+              : t
+          )
+        );
+        setEditingTrip(null);
+      }
+    } finally {
+      setEditSaving(false);
     }
   }
 
@@ -405,41 +462,188 @@ export function TripsClient({ initialTrips }: Props) {
                           {Icons.map}
                         </div>
                         <div className="min-w-0">
-                          <h3 className="font-semibold truncate">{trip.title}</h3>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <Badge variant="secondary" className="flex-shrink-0 text-xs">
+                              {tripDuration(trip.start_date, trip.end_date)}
+                            </Badge>
+                            <h3 className="font-semibold truncate">{trip.title}</h3>
+                          </div>
                           <p className="text-xs lg:text-sm text-muted-foreground mt-0.5 truncate">
                             {trip.destination} · {formatDate(trip.start_date)} –{" "}
                             {formatDate(trip.end_date)}
                           </p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        <Badge variant="secondary">
-                          {tripDuration(trip.start_date, trip.end_date)}
-                        </Badge>
-                        <button
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            if (confirm(`Delete "${trip.title}"? This cannot be undone.`)) {
-                              handleDelete(trip.id);
-                            }
-                          }}
-                          className="w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-red-600 hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100"
-                          title="Delete trip"
-                        >
-                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M3 6h18" />
-                            <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
-                            <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-                          </svg>
-                        </button>
-                      </div>
                     </div>
                   </CardContent>
                 </Card>
               </Link>
+              {/* Menu sits outside the Link/Card so its dropdown isn't clipped */}
+              <div className="absolute right-2 top-1/2 -translate-y-1/2 z-10">
+                <TripMenu
+                  onEdit={() => openEditModal(trip)}
+                  onDelete={() => setDeletingTrip(trip)}
+                />
+              </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Edit modal */}
+      {editingTrip && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4"
+          style={{ backgroundColor: "rgba(0,0,0,0.45)" }}
+          onClick={(e) => e.target === e.currentTarget && setEditingTrip(null)}
+        >
+          <div className="bg-white sm:rounded-2xl rounded-t-2xl shadow-2xl w-full sm:max-w-md flex flex-col">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+              <h2 className="font-semibold text-base">Edit Trip</h2>
+              <button
+                onClick={() => setEditingTrip(null)}
+                className="text-gray-400 hover:text-gray-600 transition-colors w-7 h-7 flex items-center justify-center rounded-lg hover:bg-gray-100"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="px-5 py-4 space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1.5">Destination</label>
+                <Input
+                  placeholder="e.g. Lisbon, Portugal"
+                  value={editForm.destination}
+                  onChange={(e) => setEditForm({ ...editForm, destination: e.target.value })}
+                  className="h-10 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1.5">Dates</label>
+                <DateRangePicker
+                  value={editDateRange}
+                  onChange={setEditDateRange}
+                  placeholder="Pick start & end date"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1.5">
+                  Notes <span className="text-muted-foreground font-normal">(optional)</span>
+                </label>
+                <Input
+                  placeholder="e.g. traveling with partner"
+                  value={editForm.notes}
+                  onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
+                  className="h-10 text-sm"
+                />
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-gray-100">
+              <button
+                onClick={() => setEditingTrip(null)}
+                className="px-4 py-2 text-sm rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleEditSave}
+                disabled={editSaving || !editForm.destination || !editDateRange.from || !editDateRange.to}
+                className="px-4 py-2 text-sm rounded-lg bg-[var(--color-brand-600)] text-white font-medium hover:opacity-90 transition-opacity disabled:opacity-40"
+              >
+                {editSaving ? "Saving…" : "Save changes"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Delete confirmation modal */}
+      {deletingTrip && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4"
+          style={{ backgroundColor: "rgba(0,0,0,0.45)" }}
+          onClick={(e) => e.target === e.currentTarget && setDeletingTrip(null)}
+        >
+          <div className="bg-white sm:rounded-2xl rounded-t-2xl shadow-2xl w-full sm:max-w-sm flex flex-col">
+            <div className="px-5 py-5">
+              <h2 className="font-semibold text-base mb-1">Delete trip?</h2>
+              <p className="text-sm text-muted-foreground">
+                <span className="font-medium text-foreground">{deletingTrip.title}</span> and all its activities will be permanently deleted. This cannot be undone.
+              </p>
+            </div>
+            <div className="flex gap-2 px-5 pb-5">
+              <button
+                onClick={() => setDeletingTrip(null)}
+                className="flex-1 px-4 py-2.5 text-sm rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => { handleDelete(deletingTrip.id); setDeletingTrip(null); }}
+                className="flex-1 px-4 py-2.5 text-sm rounded-lg bg-red-600 text-white font-medium hover:bg-red-700 transition-colors"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Trip action menu (⋯) ──────────────────────────────────────────────────────
+
+function TripMenu({
+  onEdit,
+  onDelete,
+}: {
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setOpen((o) => !o); }}
+        className="w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+        title="More options"
+      >
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+          <circle cx="12" cy="5" r="1.5" />
+          <circle cx="12" cy="12" r="1.5" />
+          <circle cx="12" cy="19" r="1.5" />
+        </svg>
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full mt-1 z-20 bg-white rounded-xl shadow-lg border border-border py-1 w-36">
+          <button
+            onClick={() => { setOpen(false); onEdit(); }}
+            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+            </svg>
+            Edit details
+          </button>
+          <button
+            onClick={() => { setOpen(false); onDelete(); }}
+            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 6h18" /><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" /><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+            </svg>
+            Delete
+          </button>
         </div>
       )}
     </div>
