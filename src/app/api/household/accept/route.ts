@@ -57,7 +57,15 @@ export async function POST(request: Request) {
       );
     }
 
-    const { error } = await supabase.from("household_members").insert({
+    // Use admin client for both operations — the household_members INSERT
+    // must bypass RLS because the accepting user's auth.uid() is member_id,
+    // not owner_id, so the "Owners manage members" policy would reject it.
+    const admin = createAdminClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+
+    const { error } = await admin.from("household_members").insert({
       owner_id: invite.owner_id,
       member_id: user.id,
     });
@@ -65,11 +73,6 @@ export async function POST(request: Request) {
     if (error) throw error;
 
     // Store owner_id in user metadata so the layout never needs to query DB.
-    // Uses service role to update auth metadata server-side.
-    const admin = createAdminClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
     await admin.auth.admin.updateUserById(user.id, {
       user_metadata: { household_owner_id: invite.owner_id },
     });
