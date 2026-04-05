@@ -161,6 +161,7 @@ type ActivityFormData = {
   description: string;
   cost: string;
   link: string;
+  sync_to_gcal: boolean;
 };
 
 type EditorState = {
@@ -259,6 +260,7 @@ function makeDefaultForm(hour: number): ActivityFormData {
     description: "",
     cost: "",
     link: "",
+    sync_to_gcal: false,
   };
 }
 
@@ -435,6 +437,23 @@ function ActivityEditorModal({
             />
           </div>
 
+          {/* Google Calendar sync */}
+          <label className="flex items-center gap-3 cursor-pointer select-none group">
+            <div className="relative flex-shrink-0">
+              <input
+                type="checkbox"
+                checked={form.sync_to_gcal}
+                onChange={(e) => setForm({ ...form, sync_to_gcal: e.target.checked })}
+                className="sr-only peer"
+              />
+              <div className="w-9 h-5 rounded-full border border-gray-200 bg-gray-100 peer-checked:bg-[var(--color-brand-600)] peer-checked:border-[var(--color-brand-600)] transition-colors" />
+              <div className="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-transform peer-checked:translate-x-4" />
+            </div>
+            <div>
+              <p className="text-sm font-medium leading-none">Sync with Google Calendar</p>
+              <p className="text-xs text-gray-400 mt-0.5">Get notifications for this event</p>
+            </div>
+          </label>
 
         </div>
 
@@ -1330,6 +1349,7 @@ export function TripCalendarView({
         description: "",
         cost: "",
         link: "",
+        sync_to_gcal: false,
       },
     });
   }
@@ -1365,6 +1385,7 @@ export function TripCalendarView({
           ? String(activity.cost_cents / 100)
           : "",
         link: activity.booking_url ?? "",
+        sync_to_gcal: !!activity.gcal_event_id,
       },
     });
   }
@@ -1438,6 +1459,7 @@ export function TripCalendarView({
         if (!error) {
           const actId = editorState.activity.id;
           const dayId = editorState.dayId;
+          const hadGcal = !!editorState.activity.gcal_event_id;
           setDays((prev) =>
             prev.map((d) =>
               d.id === dayId
@@ -1451,13 +1473,25 @@ export function TripCalendarView({
             )
           );
           if (form.start_time) {
-            syncToCalendar(
-              editorState.activity.gcal_event_id ? "update" : "create",
-              actId,
-              editorState.dayDate,
-              editorState.dayId,
-              editorState.activity.gcal_event_id
-            );
+            if (form.sync_to_gcal) {
+              // Checked: create or update in Google Calendar
+              syncToCalendar(
+                hadGcal ? "update" : "create",
+                actId,
+                editorState.dayDate,
+                editorState.dayId,
+                editorState.activity.gcal_event_id
+              );
+            } else if (hadGcal) {
+              // Unchecked but was previously synced: remove from Google Calendar
+              syncToCalendar(
+                "delete",
+                actId,
+                editorState.dayDate,
+                editorState.dayId,
+                editorState.activity.gcal_event_id
+              );
+            }
           }
           setEditorState(null);
         }
@@ -1495,7 +1529,7 @@ export function TripCalendarView({
                 : d
             )
           );
-          if (form.start_time) {
+          if (form.sync_to_gcal && form.start_time) {
             syncToCalendar("create", data.id, editorState.dayDate, editorState.dayId);
           }
           setEditorState(null);
@@ -1574,9 +1608,10 @@ export function TripCalendarView({
               }
         )
       );
-      if (day && activity) {
+      // Only sync on drag if the activity was already opted in to Google Calendar
+      if (day && activity && activity.gcal_event_id) {
         syncToCalendar(
-          activity.gcal_event_id ? "update" : "create",
+          "update",
           activityId,
           day.date,
           dayId,
