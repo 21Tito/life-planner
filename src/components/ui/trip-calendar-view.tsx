@@ -805,6 +805,13 @@ function CalendarGrid({
     }
   }, []);
 
+  // Current time indicator — updates every minute
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 60_000);
+    return () => clearInterval(id);
+  }, []);
+
   // Activity drag (move/resize) state
   const [actDrag, setActDrag] = useState<ActDragState | null>(null);
   const actDragRef = useRef<ActDragState | null>(null);
@@ -1259,6 +1266,37 @@ function CalendarGrid({
                         style={{ top: (hour - START_HOUR) * HOUR_HEIGHT + HOUR_HEIGHT / 2 }}
                       />
                     ))}
+                    {/* Past day overlay */}
+                    {day.date < `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}` && (
+                      <div className="absolute inset-0 pointer-events-none z-10 bg-white/50" />
+                    )}
+                    {/* Current time indicator + past overlay */}
+                    {(() => {
+                      const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+                      if (day.date !== todayStr) return null;
+                      const minutesSinceMidnight = now.getHours() * 60 + now.getMinutes();
+                      const topPx = (minutesSinceMidnight / 60 - START_HOUR) * HOUR_HEIGHT;
+                      if (topPx < 0 || topPx > TOTAL_HEIGHT) return null;
+                      return (
+                        <>
+                          {/* Past overlay */}
+                          <div
+                            className="absolute left-0 right-0 top-0 pointer-events-none z-10 bg-white/50"
+                            style={{ height: topPx }}
+                          />
+                          {/* Current time line */}
+                          <div
+                            className="absolute left-0 right-0 pointer-events-none z-20"
+                            style={{ top: topPx }}
+                          >
+                            <div className="relative flex items-center">
+                              <div className="w-2 h-2 rounded-full bg-red-500 shrink-0 -ml-1" />
+                              <div className="flex-1 border-t-2 border-red-500" />
+                            </div>
+                          </div>
+                        </>
+                      );
+                    })()}
                     {/* Drag selection highlight */}
                     {dragState?.dayId === day.id && (() => {
                       const fromH = Math.min(dragState.startHour, dragState.currentHour);
