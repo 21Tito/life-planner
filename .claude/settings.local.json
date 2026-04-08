@@ -35,7 +35,10 @@
       "Read(//c/Program Files/**)",
       "Read(//c/Program Files \\(x86\\)/**)",
       "Read(//c/Users/theoy/OneDrive/Desktop/life-planner/$LOCALAPPDATA/Programs/**)",
-      "Bash(npm uninstall:*)"
+      "Bash(npm uninstall:*)",
+      "Bash(npm list:*)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3000)",
+      "Bash(curl -s -X POST http://localhost:3001/api/trips/create-manual -H 'Content-Type: application/json' -d '{\"destination\":\"Test\",\"start_date\":\"2026-04-10\",\"end_date\":\"2026-04-12\"}')"
     ]
   }
 }

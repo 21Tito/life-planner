@@ -1599,8 +1599,12 @@ export function TripCalendarView({
   const [view, setView] = useState<"calendar" | "list">("calendar");
   const [editorState, setEditorState] = useState<EditorState | null>(null);
   const [saving, setSaving] = useState(false);
-  const [page, setPage] = useState(0);
   const MOBILE_PAGE_SIZE = 5;
+  const [page, setPage] = useState(() => {
+    const todayStr = new Date().toISOString().split("T")[0];
+    const todayIdx = initialDays.findIndex((d) => d.date === todayStr);
+    return todayIdx >= 0 ? Math.floor(todayIdx / MOBILE_PAGE_SIZE) : 0;
+  });
   const [tappedActivity, setTappedActivity] = useState<{
     activity: TripActivity;
     dayId: string;
