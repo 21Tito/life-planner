@@ -6,11 +6,11 @@ export default async function MealsPage() {
   const supabase = await createClient();
   const { ownerId } = await getSessionIds(supabase);
 
-  const { data: pantryItems } = await supabase
-    .from("pantry_items")
+  const { data: items } = await supabase
+    .from("grocery_list_items")
     .select("*")
     .eq("user_id", ownerId)
-    .order("category");
+    .order("created_at");
 
-  return <MealsClient initialPantryItems={pantryItems ?? []} />;
+  return <MealsClient initialItems={items ?? []} />;
 }

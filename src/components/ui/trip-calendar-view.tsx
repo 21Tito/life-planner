@@ -1108,8 +1108,8 @@ function CalendarGrid({
                   <span className="text-[9px] font-semibold uppercase tracking-widest text-[var(--color-text-muted)]">
                     {d.toLocaleDateString("en-US", { weekday: "short" })}
                   </span>
-                  <span className="text-base font-bold text-[var(--color-brand-600)] leading-none">
-                    {d.getDate()}
+                  <span className="text-[11px] font-bold text-[var(--color-brand-600)] leading-none">
+                    {d.getMonth() + 1}/{d.getDate()}/{String(d.getFullYear()).slice(-2)}
                   </span>
                 </div>
               </div>

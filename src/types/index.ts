@@ -12,72 +12,12 @@ export interface Profile {
   updated_at: string;
 }
 
-export interface PantryItem {
+export interface GroceryListItem {
   id: string;
-  user_id: string;
-  name: string;
-  category: PantryCategory;
-  quantity: string | null;
-  expiry_date: string | null;
-  created_at: string;
-}
-
-export type PantryCategory =
-  | "protein"
-  | "dairy"
-  | "vegetable"
-  | "fruit"
-  | "grain"
-  | "spice"
-  | "condiment"
-  | "frozen"
-  | "beverage"
-  | "other";
-
-export interface MealPlan {
-  id: string;
-  user_id: string;
-  title: string;
-  week_start: string;
-  preferences: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface Meal {
-  id: string;
-  meal_plan_id: string;
-  user_id: string;
-  day_of_week: number; // 0=Mon, 6=Sun
-  meal_type: "breakfast" | "lunch" | "dinner" | "snack";
-  title: string;
-  description: string | null;
-  recipe: Recipe | null;
-  created_at: string;
-}
-
-export interface Recipe {
-  ingredients: RecipeIngredient[];
-  steps: string[];
-  prep_time_minutes: number;
-  cook_time_minutes: number;
-  servings: number;
-}
-
-export interface RecipeIngredient {
-  name: string;
-  amount: string;
-  unit: string;
-  from_pantry: boolean; // true if user already has it
-}
-
-export interface GroceryItem {
-  id: string;
-  meal_plan_id: string;
   user_id: string;
   name: string;
   quantity: string | null;
-  category: string | null;
+  is_staple: boolean;
   checked: boolean;
   created_at: string;
 }
@@ -160,12 +100,6 @@ export interface GoogleTokens {
 // ===========================================
 // API request/response types
 // ===========================================
-
-export interface GenerateMealPlanRequest {
-  pantry_items: Pick<PantryItem, "name" | "category" | "quantity">[];
-  preferences?: string; // dietary preferences, allergies, etc.
-  days?: number; // how many days to plan (default 7)
-}
 
 export interface GenerateTripRequest {
   destination: string;
