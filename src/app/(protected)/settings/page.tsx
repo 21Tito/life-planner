@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { getSessionIds } from "@/lib/get-owner-id";
 import { SettingsClient } from "./settings-client";
 
@@ -6,8 +7,6 @@ export default async function SettingsPage() {
   const supabase = await createClient();
   const { userId } = await getSessionIds(supabase);
 
-  // All queries run in parallel. The members query joins profiles inline
-  // so there's no sequential second roundtrip to fetch member names/avatars.
   const [{ data: membersRaw }, { data: invite }, { data: ownMembership }] =
     await Promise.all([
       supabase
@@ -26,15 +25,28 @@ export default async function SettingsPage() {
         .maybeSingle(),
     ]);
 
-  const members = (membersRaw ?? []).map((m) => {
-    const profile = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles;
-    return {
-      id: m.member_id,
-      name: profile?.full_name ?? "Unknown",
-      avatar: profile?.avatar_url ?? null,
-      joinedAt: m.created_at,
-    };
-  });
+  // For members missing a full_name, fetch their email via admin as a fallback
+  const admin = createAdminClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
+  const members = await Promise.all(
+    (membersRaw ?? []).map(async (m) => {
+      const profile = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles;
+      let name = profile?.full_name ?? null;
+      if (!name) {
+        const { data } = await admin.auth.admin.getUserById(m.member_id);
+        name = data.user?.email ?? "Unknown";
+      }
+      return {
+        id: m.member_id,
+        name,
+        avatar: profile?.avatar_url ?? null,
+        joinedAt: m.created_at,
+      };
+    })
+  );
 
   return (
     <SettingsClient
