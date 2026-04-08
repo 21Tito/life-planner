@@ -16,9 +16,10 @@ interface Props {
   members: Member[];
   activeToken: string | null;
   isMember: boolean;
+  ownerName: string | null;
 }
 
-export function SettingsClient({ members, activeToken, isMember }: Props) {
+export function SettingsClient({ members, activeToken, isMember, ownerName }: Props) {
   const router = useRouter();
   const [currentMembers, setCurrentMembers] = useState<Member[]>(members);
   const [token, setToken] = useState<string | null>(activeToken);
@@ -73,14 +74,48 @@ export function SettingsClient({ members, activeToken, isMember }: Props) {
         <p className="text-sm text-muted-foreground mb-8">
           Manage your account preferences.
         </p>
-        <Card>
+        <Card className="mb-6">
           <CardContent className="py-5 px-5">
             <p className="text-sm text-muted-foreground">
-              You are a member of someone else&apos;s household. You can see and
-              edit their shared trips and meals.
+              You are a member of{ownerName ? ` ${ownerName}'s` : " someone else's"} household. You can see and edit their shared trips and meals.
             </p>
           </CardContent>
         </Card>
+        {members.length > 0 && (
+          <Card>
+            <CardContent className="py-5 px-5">
+              <h2 className="text-base font-semibold mb-4">
+                Members{" "}
+                <span className="text-muted-foreground font-normal text-sm">
+                  ({members.length})
+                </span>
+              </h2>
+              <ul className="space-y-3">
+                {members.map((member) => (
+                  <li key={member.id} className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center text-sm font-semibold text-primary/70 flex-shrink-0">
+                      {member.avatar ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={member.avatar} alt={member.name} className="w-8 h-8 rounded-full object-cover" />
+                      ) : (
+                        member.name.charAt(0).toUpperCase()
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">{member.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Joined{" "}
+                        {new Date(member.joinedAt).toLocaleDateString("en-US", {
+                          month: "short", day: "numeric", year: "numeric",
+                        })}
+                      </p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+        )}
       </div>
     );
   }
