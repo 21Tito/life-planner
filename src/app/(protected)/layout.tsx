@@ -10,24 +10,22 @@ export default async function ProtectedLayout({
   children: React.ReactNode;
 }) {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
 
-  if (!user) {
-    redirect("/login");
-  }
+  // getSession() reads from the cookie instantly (no network round-trip),
+  // giving us the user ID so we can fire the profile fetch in parallel
+  // with getUser() which verifies the JWT with the auth server.
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) redirect("/login");
 
-  // household_owner_id is written into user_metadata when they accept an invite.
-  // No extra DB query needed — it's baked into the JWT.
+  const [{ data: { user } }, { data: profile }] = await Promise.all([
+    supabase.auth.getUser(),
+    supabase.from("profiles").select("full_name, avatar_url").eq("id", session.user.id).single(),
+  ]);
+
+  if (!user) redirect("/login");
+
   const ownerId =
     (user.user_metadata?.household_owner_id as string | undefined) ?? user.id;
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("id", user.id)
-    .single();
 
   return (
     <HouseholdProvider ownerId={ownerId}>
