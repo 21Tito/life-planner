@@ -63,6 +63,7 @@ export interface TripActivity {
   booking_url: string | null;
   sort_order: number;
   gcal_event_id: string | null;
+  done: boolean;
   created_at: string;
 }
 

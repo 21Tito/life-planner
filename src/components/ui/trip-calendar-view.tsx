@@ -154,6 +154,7 @@ type ActivityFormData = {
   category: ActivityCategory;
   start_time: string;
   end_time: string;
+  date: string; // YYYY-MM-DD
   location: string;
   description: string;
   cost: string;
@@ -169,6 +170,20 @@ type EditorState = {
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function linkifyText(text: string): React.ReactNode {
+  const urlRegex = /(https?:\/\/[^\s]+)/g;
+  const parts = text.split(urlRegex);
+  return parts.map((part, i) =>
+    urlRegex.test(part) ? (
+      <a key={i} href={part} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline break-all">
+        {part}
+      </a>
+    ) : (
+      part
+    )
+  );
+}
 
 function timeToMinutes(time: string): number {
   const [h, m] = time.split(":").map(Number);
@@ -239,6 +254,7 @@ type ActDragState = {
   activityId: string;
   activity: TripActivity;
   dayId: string;
+  targetDayId: string;
   grabOffsetMinutes: number;
   startMinutes: number;
   endMinutes: number;
@@ -251,6 +267,7 @@ function makeDefaultForm(hour: number): ActivityFormData {
   return {
     title: "",
     category: "activity",
+    date: "",
     start_time: `${String(hour).padStart(2, "0")}:00`,
     end_time: `${String(endHour).padStart(2, "0")}:00`,
     location: "",
@@ -269,12 +286,14 @@ function ActivityEditorModal({
   onClose,
   onSave,
   onDelete,
+  tripDates,
 }: {
   editorState: EditorState;
   saving: boolean;
   onClose: () => void;
   onSave: (form: ActivityFormData) => void;
   onDelete: () => void;
+  tripDates: string[];
 }) {
   const [form, setForm] = useState<ActivityFormData>(editorState.form);
   const isEditing = !!editorState.activity;
@@ -358,6 +377,26 @@ function ActivityEditorModal({
               onChange={(e) => setForm({ ...form, title: e.target.value })}
               className="w-full h-10 px-3 rounded-lg border border-gray-200 text-base focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-600)]/30 focus:border-[var(--color-brand-600)]"
             />
+          </div>
+
+          {/* Date */}
+          <div>
+            <label className="block text-sm font-medium mb-1.5">Date</label>
+            <select
+              value={form.date}
+              onChange={(e) => setForm({ ...form, date: e.target.value })}
+              className="w-full h-10 px-3 rounded-lg border border-gray-200 text-base bg-white focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-600)]/30 focus:border-[var(--color-brand-600)]"
+            >
+              {tripDates.map((d) => (
+                <option key={d} value={d}>
+                  {new Date(d + "T00:00:00").toLocaleDateString("en-US", {
+                    weekday: "short",
+                    month: "short",
+                    day: "numeric",
+                  })}
+                </option>
+              ))}
+            </select>
           </div>
 
           {/* Time */}
@@ -529,15 +568,15 @@ function ListView({ days }: { days: DayWithActivities[] }) {
                 return (
                   <div
                     key={activity.id}
-                    className={`rounded-lg border ${config.border} ${config.bg} p-4`}
+                    className={`rounded-lg border ${config.border} ${config.bg} p-4 ${activity.done ? "opacity-50" : ""}`}
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-start gap-3">
                         <div
-                          className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${config.dot}`}
+                          className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${activity.done ? "bg-gray-400" : config.dot}`}
                         />
                         <div>
-                          <h3 className={`font-medium text-sm ${config.text}`}>
+                          <h3 className={`font-medium text-sm ${config.text} ${activity.done ? "line-through" : ""}`}>
                             {activity.title}
                           </h3>
                           {activity.description && (
@@ -777,6 +816,7 @@ function CalendarGrid({
   onActivityEdit,
   onUpdateDayField,
   onActivityTimeUpdate,
+  onActivityDayUpdate,
   onHotelClick,
   onAddHotel,
 }: {
@@ -786,6 +826,7 @@ function CalendarGrid({
   onActivityEdit?: (activity: TripActivity, dayId: string) => void;
   onUpdateDayField?: (dayId: string, field: "title" | "notes", value: string) => void;
   onActivityTimeUpdate?: (activityId: string, dayId: string, startTime: string, endTime: string) => void;
+  onActivityDayUpdate?: (activityId: string, fromDayId: string, toDayId: string, startTime: string, endTime: string) => void;
   onHotelClick?: (hotel: TripHotel) => void;
   onAddHotel?: (date: string) => void;
 }) {
@@ -869,21 +910,43 @@ function CalendarGrid({
         if (Math.sqrt(dx * dx + dy * dy) > 5) dragMovedRef.current = true;
       }
       updateDragFromClientY(e.clientY);
+      // Detect which day column the cursor is over
+      if (actDragRef.current?.type === "move") {
+        const el = document.elementFromPoint(e.clientX, e.clientY);
+        const col = el?.closest("[data-day-id]");
+        const hoveredDayId = col?.getAttribute("data-day-id");
+        if (hoveredDayId) {
+          setActDrag((prev) =>
+            prev && prev.targetDayId !== hoveredDayId
+              ? { ...prev, targetDayId: hoveredDayId }
+              : prev
+          );
+        }
+      }
     }
 
     function onUp() {
       const drag = actDragRef.current;
       if (!drag) return;
       if (dragMovedRef.current) {
-        onActivityTimeUpdate?.(
-          drag.activityId,
-          drag.dayId,
-          minutesToTime(drag.startMinutes),
-          minutesToTime(drag.endMinutes)
-        );
-      } else {
-        onActivityEdit?.(drag.activity, drag.dayId);
+        if (drag.targetDayId !== drag.dayId) {
+          onActivityDayUpdate?.(
+            drag.activityId,
+            drag.dayId,
+            drag.targetDayId,
+            minutesToTime(drag.startMinutes),
+            minutesToTime(drag.endMinutes)
+          );
+        } else {
+          onActivityTimeUpdate?.(
+            drag.activityId,
+            drag.dayId,
+            minutesToTime(drag.startMinutes),
+            minutesToTime(drag.endMinutes)
+          );
+        }
       }
+      // No-drag tap case is handled by the native listener in startActivityMove.
       setActDrag(null);
       dragMovedRef.current = false;
     }
@@ -891,19 +954,43 @@ function CalendarGrid({
     function onTouchMove(e: TouchEvent) {
       if (!isTouchDraggingRef.current) return;
       e.preventDefault(); // block scroll while dragging
-      updateDragFromClientY(e.touches[0].clientY);
+      const touch = e.touches[0];
+      updateDragFromClientY(touch.clientY);
+      // Detect target day column
+      if (actDragRef.current?.type === "move") {
+        const el = document.elementFromPoint(touch.clientX, touch.clientY);
+        const col = el?.closest("[data-day-id]");
+        const hoveredDayId = col?.getAttribute("data-day-id");
+        if (hoveredDayId) {
+          setActDrag((prev) =>
+            prev && prev.targetDayId !== hoveredDayId
+              ? { ...prev, targetDayId: hoveredDayId }
+              : prev
+          );
+        }
+      }
     }
 
     function onTouchEnd() {
       if (!isTouchDraggingRef.current) return;
       const drag = actDragRef.current;
       if (drag) {
-        onActivityTimeUpdate?.(
-          drag.activityId,
-          drag.dayId,
-          minutesToTime(drag.startMinutes),
-          minutesToTime(drag.endMinutes)
-        );
+        if (drag.targetDayId !== drag.dayId) {
+          onActivityDayUpdate?.(
+            drag.activityId,
+            drag.dayId,
+            drag.targetDayId,
+            minutesToTime(drag.startMinutes),
+            minutesToTime(drag.endMinutes)
+          );
+        } else {
+          onActivityTimeUpdate?.(
+            drag.activityId,
+            drag.dayId,
+            minutesToTime(drag.startMinutes),
+            minutesToTime(drag.endMinutes)
+          );
+        }
       }
       setActDrag(null);
       isTouchDraggingRef.current = false;
@@ -968,11 +1055,23 @@ function CalendarGrid({
     const columnTop = cardRect.top - pos.top - 2;
     dragStartPosRef.current = { x: e.clientX, y: e.clientY };
     dragMovedRef.current = false;
+
+    // Register a native mouseup listener immediately so a quick tap is caught
+    // even before React re-renders and adds the drag-system's onUp listener.
+    const onTapUp = () => {
+      window.removeEventListener("mouseup", onTapUp);
+      if (!dragMovedRef.current) {
+        onActivityEdit?.(activity, dayId);
+      }
+    };
+    window.addEventListener("mouseup", onTapUp);
+
     setActDrag({
       type: "move",
       activityId: activity.id,
       activity,
       dayId,
+      targetDayId: dayId,
       grabOffsetMinutes: ((e.clientY - cardRect.top) / HOUR_HEIGHT) * 60,
       startMinutes: startMins,
       endMinutes: endMins,
@@ -1001,6 +1100,7 @@ function CalendarGrid({
       activityId: activity.id,
       activity,
       dayId,
+      targetDayId: dayId,
       grabOffsetMinutes: 0,
       startMinutes: startMins,
       endMinutes: endMins,
@@ -1061,6 +1161,7 @@ function CalendarGrid({
         activityId: info.activity.id,
         activity: info.activity,
         dayId: info.dayId,
+        targetDayId: info.dayId,
         grabOffsetMinutes: ((info.clientY - info.cardTop) / HOUR_HEIGHT) * 60,
         startMinutes: startMins,
         endMinutes: endMins,
@@ -1081,7 +1182,15 @@ function CalendarGrid({
   }
 
   function handleCardTouchEnd() {
-    if (!isTouchDraggingRef.current) cancelTouchLongPress();
+    if (!isTouchDraggingRef.current) {
+      cancelTouchLongPress();
+      // Quick tap (no long-press drag) → open quick actions
+      const info = touchDragStartRef.current;
+      if (info) {
+        touchDragStartRef.current = null;
+        onActivityEdit?.(info.activity, info.dayId);
+      }
+    }
   }
 
   return (
@@ -1243,6 +1352,7 @@ function CalendarGrid({
 
                   {/* Time grid */}
                   <div
+                    data-day-id={day.id}
                     className="relative cursor-pointer select-none"
                     style={{ height: TOTAL_HEIGHT }}
                     onMouseDown={(e) => handleMouseDown(e, day)}
@@ -1317,16 +1427,29 @@ function CalendarGrid({
                     {/* Activity cards */}
                     {activities.map((activity) => {
                       const isDragging = actDrag?.activityId === activity.id;
+                      const isCrossDayDrag = isDragging && actDrag!.targetDayId !== actDrag!.dayId;
                       const basePos = getActivityPosition(activity);
                       if (!basePos && !isDragging) return null;
+
+                      const config = getCategoryConfig(activity.category);
+
+                      // Cross-day drag: show a ghost placeholder in the source day
+                      if (isCrossDayDrag) {
+                        const ghostTop = basePos ? basePos.top + 2 : 0;
+                        const ghostHeight = basePos ? Math.max(basePos.height - 4, 20) : 40;
+                        return (
+                          <div
+                            key={activity.id}
+                            className={`absolute inset-x-1 rounded-lg border-2 border-dashed pointer-events-none z-0 ${config.border} opacity-30`}
+                            style={{ top: ghostTop, height: ghostHeight }}
+                          />
+                        );
+                      }
 
                       const displayStartMins = isDragging ? actDrag!.startMinutes : (activity.start_time ? timeToMinutes(activity.start_time) : START_HOUR * 60);
                       const displayEndMins = isDragging ? actDrag!.endMinutes : (activity.end_time ? timeToMinutes(activity.end_time) : displayStartMins + 60);
                       const displayTop = (displayStartMins / 60 - START_HOUR) * HOUR_HEIGHT + 2;
                       const displayHeight = Math.max(((displayEndMins - displayStartMins) / 60) * HOUR_HEIGHT - 4, 20);
-
-                      if (!isDragging && !basePos) return null;
-                      const config = getCategoryConfig(activity.category);
 
                       return (
                         <div
@@ -1341,13 +1464,20 @@ function CalendarGrid({
                             isDragging
                               ? "shadow-xl z-30 opacity-90 cursor-grabbing scale-[1.02]"
                               : "hover:shadow-md hover:z-10 z-0 cursor-grab"
-                          } ${config.bg} ${config.border} ${config.text} transition-transform`}
+                          } ${config.bg} ${config.border} ${config.text} transition-transform ${activity.done ? "opacity-40" : ""}`}
                           style={{ top: displayTop, height: displayHeight }}
                         >
                           <div className="p-1.5 h-full flex flex-col overflow-hidden pointer-events-none">
-                            <span className="text-[11px] font-semibold leading-tight line-clamp-2">
-                              {activity.title}
-                            </span>
+                            <div className="flex items-start gap-1 leading-tight">
+                              {activity.done && (
+                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 mt-[1px]">
+                                  <path d="M20 6 9 17l-5-5" />
+                                </svg>
+                              )}
+                              <span className={`text-[11px] font-semibold line-clamp-2 ${activity.done ? "line-through opacity-60" : ""}`}>
+                                {activity.title}
+                              </span>
+                            </div>
                             {activity.description && displayHeight >= 48 && !isDragging && (
                               <span className="text-[9px] leading-snug opacity-70 mt-0.5 line-clamp-2">
                                 {activity.description}
@@ -1374,6 +1504,28 @@ function CalendarGrid({
                         </div>
                       );
                     })}
+
+                    {/* Floating card in target day during cross-day drag */}
+                    {actDrag?.targetDayId === day.id && actDrag.dayId !== day.id && (() => {
+                      const config = getCategoryConfig(actDrag.activity.category);
+                      const displayTop = (actDrag.startMinutes / 60 - START_HOUR) * HOUR_HEIGHT + 2;
+                      const displayHeight = Math.max(((actDrag.endMinutes - actDrag.startMinutes) / 60) * HOUR_HEIGHT - 4, 20);
+                      return (
+                        <div
+                          className={`absolute inset-x-1 rounded-lg border pointer-events-none shadow-xl z-30 opacity-90 scale-[1.02] ${config.bg} ${config.border} ${config.text}`}
+                          style={{ top: displayTop, height: displayHeight }}
+                        >
+                          <div className="p-1.5 h-full flex flex-col overflow-hidden">
+                            <span className="text-[11px] font-semibold line-clamp-2">{actDrag.activity.title}</span>
+                            {displayHeight >= 36 && (
+                              <span className="text-[9px] opacity-60 mt-auto shrink-0">
+                                {`${formatMinutes(actDrag.startMinutes)} – ${formatMinutes(actDrag.endMinutes)}`}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
               );
@@ -1703,6 +1855,7 @@ export function TripCalendarView({
       form: {
         title: "",
         category: "activity",
+        date: dayDate,
         start_time: hourToTimeStr(startHour),
         end_time: hourToTimeStr(Math.min(endHour, END_HOUR)),
         location: "",
@@ -1715,12 +1868,11 @@ export function TripCalendarView({
   }
 
   function handleActivityTap(activity: TripActivity, dayId: string) {
-    // If no Maps URL, go straight to edit
-    if (!activity.booking_url) {
+    if (activity.start_time) {
+      setTappedActivity({ activity, dayId });
+    } else {
       openEditEditor(activity, dayId);
-      return;
     }
-    setTappedActivity({ activity, dayId });
   }
 
   async function openEditEditor(activity: TripActivity, dayId: string) {
@@ -1739,6 +1891,7 @@ export function TripCalendarView({
         end_time:
           activity.end_time ??
           `${String(START_HOUR + 1).padStart(2, "0")}:00`,
+        date: day?.date ?? "",
         location: activity.location ?? "",
         description: activity.description ?? "",
         cost: activity.cost_cents
@@ -1792,6 +1945,24 @@ export function TripCalendarView({
       .catch(() => {});
   }
 
+  async function handleToggleDone(activityId: string, dayId: string, currentDone: boolean) {
+    const newDone = !currentDone;
+    // Optimistic update
+    setDays((prev) =>
+      prev.map((d) =>
+        d.id === dayId
+          ? {
+              ...d,
+              trip_activities: d.trip_activities.map((a) =>
+                a.id === activityId ? { ...a, done: newDone } : a
+              ),
+            }
+          : d
+      )
+    );
+    await supabase.from("trip_activities").update({ done: newDone }).eq("id", activityId);
+  }
+
   async function handleSave(form: ActivityFormData) {
     if (!editorState || !userId) return;
     setSaving(true);
@@ -1799,7 +1970,10 @@ export function TripCalendarView({
     try {
       if (editorState.activity) {
         // Update existing activity
-        const updates = {
+        const dateChanged = form.date && form.date !== editorState.dayDate;
+        const newDay = dateChanged ? days.find((d) => d.date === form.date) : null;
+
+        const updates: Record<string, unknown> = {
           title: form.title.trim(),
           category: form.category,
           start_time: form.start_time || null,
@@ -1811,6 +1985,8 @@ export function TripCalendarView({
             : null,
           booking_url: form.link.trim() || null,
         };
+        if (newDay) updates.trip_day_id = newDay.id;
+
         const { error } = await supabase
           .from("trip_activities")
           .update(updates)
@@ -1818,37 +1994,55 @@ export function TripCalendarView({
 
         if (!error) {
           const actId = editorState.activity.id;
-          const dayId = editorState.dayId;
+          const oldDayId = editorState.dayId;
           const hadGcal = !!editorState.activity.gcal_event_id;
-          setDays((prev) =>
-            prev.map((d) =>
-              d.id === dayId
-                ? {
-                    ...d,
-                    trip_activities: d.trip_activities.map((a) =>
-                      a.id === actId ? { ...a, ...updates } : a
-                    ),
-                  }
-                : d
-            )
-          );
+
+          if (newDay) {
+            // Move activity from old day to new day in local state
+            setDays((prev) => {
+              const act = prev
+                .find((d) => d.id === oldDayId)
+                ?.trip_activities.find((a) => a.id === actId);
+              return prev.map((d) => {
+                if (d.id === oldDayId)
+                  return { ...d, trip_activities: d.trip_activities.filter((a) => a.id !== actId) };
+                if (d.id === newDay.id)
+                  return { ...d, trip_activities: [...d.trip_activities, { ...act!, ...updates, trip_day_id: newDay.id }] };
+                return d;
+              });
+            });
+          } else {
+            setDays((prev) =>
+              prev.map((d) =>
+                d.id === oldDayId
+                  ? {
+                      ...d,
+                      trip_activities: d.trip_activities.map((a) =>
+                        a.id === actId ? { ...a, ...updates } : a
+                      ),
+                    }
+                  : d
+              )
+            );
+          }
+
+          const effectiveDayId = newDay?.id ?? oldDayId;
+          const effectiveDayDate = newDay?.date ?? editorState.dayDate;
           if (form.start_time) {
             if (form.sync_to_gcal) {
-              // Checked: create or update in Google Calendar
               syncToCalendar(
                 hadGcal ? "update" : "create",
                 actId,
-                editorState.dayDate,
-                editorState.dayId,
+                effectiveDayDate,
+                effectiveDayId,
                 editorState.activity.gcal_event_id
               );
             } else if (hadGcal) {
-              // Unchecked but was previously synced: remove from Google Calendar
               syncToCalendar(
                 "delete",
                 actId,
-                editorState.dayDate,
-                editorState.dayId,
+                effectiveDayDate,
+                effectiveDayId,
                 editorState.activity.gcal_event_id
               );
             }
@@ -1981,6 +2175,36 @@ export function TripCalendarView({
     }
   }
 
+  async function handleActivityDayUpdate(
+    activityId: string,
+    fromDayId: string,
+    toDayId: string,
+    startTime: string,
+    endTime: string
+  ) {
+    const fromDay = days.find((d) => d.id === fromDayId);
+    const activity = fromDay?.trip_activities.find((a) => a.id === activityId);
+    if (!activity) return;
+
+    const updates = { trip_day_id: toDayId, start_time: startTime, end_time: endTime };
+    const { error } = await supabase
+      .from("trip_activities")
+      .update(updates)
+      .eq("id", activityId);
+
+    if (!error) {
+      setDays((prev) =>
+        prev.map((d) => {
+          if (d.id === fromDayId)
+            return { ...d, trip_activities: d.trip_activities.filter((a) => a.id !== activityId) };
+          if (d.id === toDayId)
+            return { ...d, trip_activities: [...d.trip_activities, { ...activity, ...updates }] };
+          return d;
+        })
+      );
+    }
+  }
+
   async function handleUpdateDayField(
     dayId: string,
     field: "title" | "notes",
@@ -2068,10 +2292,11 @@ export function TripCalendarView({
           onClose={() => setEditorState(null)}
           onSave={handleSave}
           onDelete={handleDelete}
+          tripDates={tripDates}
         />
       )}
 
-      {/* Quick action sheet when tapping an activity with a location */}
+      {/* Quick action sheet when tapping an activity */}
       {tappedActivity && (
         <div
           className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4"
@@ -2082,7 +2307,8 @@ export function TripCalendarView({
             className="bg-white sm:rounded-2xl rounded-t-2xl shadow-2xl w-full sm:max-w-xs overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="px-5 pt-4 pb-2">
+            {/* Header */}
+            <div className="px-5 pt-4 pb-3">
               <h3 className="font-semibold text-sm truncate">
                 {tappedActivity.activity.title}
               </h3>
@@ -2094,27 +2320,44 @@ export function TripCalendarView({
                 </p>
               )}
             </div>
-            <div className="px-3 pb-3 space-y-1">
-              <button
-                onClick={() => {
-                  window.open(tappedActivity.activity.booking_url!, "_blank");
-                  setTappedActivity(null);
-                }}
-                className="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-gray-50 transition-colors text-left"
-              >
-                <div className="w-9 h-9 rounded-lg bg-green-50 flex items-center justify-center flex-shrink-0">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-green-600">
-                    <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
-                    <circle cx="12" cy="9" r="2.5"/>
-                  </svg>
-                </div>
-                <div>
-                  <span className="text-sm font-medium">Open in Maps</span>
-                  <p className="text-[11px] text-[var(--color-text-muted)] truncate max-w-[200px]">
-                    {tappedActivity.activity.location || tappedActivity.activity.booking_url}
+
+            {/* Actions */}
+            <div className="px-3 space-y-1">
+              {/* Open in Maps */}
+              {(tappedActivity.activity.location || tappedActivity.activity.booking_url) && (
+                <button
+                  onClick={() => {
+                    window.open(tappedActivity.activity.booking_url!, "_blank");
+                    setTappedActivity(null);
+                  }}
+                  className="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-gray-50 transition-colors text-left"
+                >
+                  <div className="w-9 h-9 rounded-lg bg-green-50 flex items-center justify-center flex-shrink-0">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-green-600">
+                      <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
+                      <circle cx="12" cy="9" r="2.5"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <span className="text-sm font-medium">Open in Maps</span>
+                    <p className="text-[11px] text-[var(--color-text-muted)] truncate max-w-[200px]">
+                      {tappedActivity.activity.location || tappedActivity.activity.booking_url}
+                    </p>
+                  </div>
+                </button>
+              )}
+
+              {/* Notes */}
+              {tappedActivity.activity.description && (
+                <div className="px-3 py-3">
+                  <p className="text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wider mb-1">Notes</p>
+                  <p className="text-sm text-foreground leading-snug break-words">
+                    {linkifyText(tappedActivity.activity.description)}
                   </p>
                 </div>
-              </button>
+              )}
+
+              {/* Edit Activity */}
               <button
                 onClick={() => {
                   const { activity, dayId } = tappedActivity;
@@ -2131,6 +2374,30 @@ export function TripCalendarView({
                 <span className="text-sm font-medium">Edit Activity</span>
               </button>
             </div>
+
+            {/* Mark as done — separated, smaller, harder to misclick */}
+            <div className="mx-4 my-3 border-t border-gray-100 pt-3">
+              <button
+                onClick={() => {
+                  const { activity, dayId } = tappedActivity;
+                  handleToggleDone(activity.id, dayId, activity.done);
+                  setTappedActivity(null);
+                }}
+                className="w-full flex items-center justify-between px-2 py-1.5 rounded-lg hover:bg-gray-50 transition-colors text-left"
+              >
+                <span className="text-xs text-[var(--color-text-muted)]">
+                  {tappedActivity.activity.done ? "Marked as done" : "Mark as done"}
+                </span>
+                <div className={`w-4 h-4 rounded flex items-center justify-center border ${tappedActivity.activity.done ? "bg-green-500 border-green-500" : "border-gray-300 bg-white"}`}>
+                  {tappedActivity.activity.done && (
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M20 6 9 17l-5-5" />
+                    </svg>
+                  )}
+                </div>
+              </button>
+            </div>
+
             <button
               onClick={() => setTappedActivity(null)}
               className="w-full py-3 text-sm text-[var(--color-text-muted)] border-t border-gray-100 hover:bg-gray-50 transition-colors"
@@ -2240,6 +2507,7 @@ export function TripCalendarView({
           onActivityEdit={handleActivityTap}
           onUpdateDayField={handleUpdateDayField}
           onActivityTimeUpdate={handleActivityTimeUpdate}
+          onActivityDayUpdate={handleActivityDayUpdate}
           onHotelClick={(hotel) => setTappedHotel(hotel)}
           onAddHotel={(date) => setHotelModal({ open: true, hotel: null, prefillDate: date })}
         />

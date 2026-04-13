@@ -20,8 +20,7 @@ export default async function DashboardPage() {
       .from("trips")
       .select("*")
       .eq("user_id", ownerId)
-      .order("created_at", { ascending: false })
-      .limit(3),
+      .order("start_date", { ascending: true }),
   ]);
 
   const mealCount = mealPlans?.length ?? 0;
@@ -55,55 +54,57 @@ export default async function DashboardPage() {
         />
       </div>
 
-      {/* Feature cards */}
-      <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3 lg:mb-4">
-        Quick Actions
-      </h2>
-      <div className="grid gap-3 lg:gap-4 grid-cols-1 sm:grid-cols-2">
-        <Link href="/meals">
-          <Card className="hover:ring-primary/30 hover:shadow-md transition-all cursor-pointer">
-            <CardContent className="p-5 lg:p-6 flex items-start gap-4 sm:flex-col sm:items-start">
-              <div className="w-10 h-10 rounded-lg bg-secondary flex items-center justify-center text-primary/70 flex-shrink-0">
-                {Icons.clipboard}
-              </div>
-              <div>
-                <h3 className="text-base font-semibold mb-1">Meal Planner</h3>
-                <p className="text-sm text-muted-foreground">
-                  Plan your week&apos;s meals based on what&apos;s in your fridge
-                </p>
-                {mealCount > 0 && (
-                  <p className="text-xs font-medium text-primary mt-2">
-                    {mealCount} plan{mealCount !== 1 ? "s" : ""} created →
-                  </p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </Link>
-
-        <Link href="/trips">
-          <Card className="hover:ring-primary/30 hover:shadow-md transition-all cursor-pointer">
-            <CardContent className="p-5 lg:p-6 flex items-start gap-4 sm:flex-col sm:items-start">
-              <div className="w-10 h-10 rounded-lg bg-secondary flex items-center justify-center text-primary/70 flex-shrink-0">
-                {Icons.map}
-              </div>
-              <div>
-                <h3 className="text-base font-semibold mb-1">Trip Planner</h3>
-                <p className="text-sm text-muted-foreground">
-                  Plan your next adventure with a day-by-day itinerary
-                </p>
-                {tripCount > 0 && (
-                  <p className="text-xs font-medium text-primary mt-2">
-                    {tripCount} trip{tripCount !== 1 ? "s" : ""} planned →
-                  </p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+      {/* Trips */}
+      <div className="flex items-center justify-between mb-3 lg:mb-4">
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          Your Trips
+        </h2>
+        <Link href="/trips" className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+          View all →
         </Link>
       </div>
+      {trips && trips.length > 0 ? (
+        <div className="space-y-3">
+          {trips.map((trip) => (
+            <Link key={trip.id} href={`/trips/${trip.id}`} className="block">
+              <Card className="hover:ring-primary/30 hover:shadow-md transition-all cursor-pointer">
+                <CardContent className="py-4 px-5">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-lg bg-secondary flex items-center justify-center text-primary/70 flex-shrink-0">
+                      {Icons.map}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <h3 className="font-semibold truncate">{trip.destination}</h3>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {formatDate(trip.start_date)} – {formatDate(trip.end_date)}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+          ))}
+        </div>
+      ) : (
+        <Link href="/trips">
+          <Card className="hover:ring-primary/30 hover:shadow-md transition-all cursor-pointer border-dashed">
+            <CardContent className="py-6 px-5 flex items-center justify-center gap-2 text-muted-foreground">
+              {Icons.map}
+              <span className="text-sm">Plan your first trip</span>
+            </CardContent>
+          </Card>
+        </Link>
+      )}
     </div>
   );
+}
+
+function formatDate(dateStr: string) {
+  return new Date(dateStr + "T00:00:00").toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
 }
 
 function getGreeting() {
