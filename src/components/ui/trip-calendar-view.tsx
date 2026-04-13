@@ -74,7 +74,7 @@ const CATEGORY_CONFIG: Record<
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const HOUR_HEIGHT = 80;
-const START_HOUR = 1;
+const START_HOUR = 7;
 const END_HOUR = 24;
 const TIME_COL_WIDTH = 52;
 const TOTAL_HEIGHT = (END_HOUR - START_HOUR) * HOUR_HEIGHT;
@@ -838,11 +838,15 @@ function CalendarGrid({
     currentHour: number;
   } | null>(null);
 
-  // Scroll to 8 AM on mount
+  // Scroll to current time (centered) on mount
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (scrollContainerRef.current) {
-      scrollContainerRef.current.scrollTop = (8 - START_HOUR) * HOUR_HEIGHT;
+      const nowDate = new Date();
+      const currentHourDecimal = nowDate.getHours() + nowDate.getMinutes() / 60;
+      const currentTimeTop = (currentHourDecimal - START_HOUR) * HOUR_HEIGHT;
+      const containerHeight = scrollContainerRef.current.clientHeight;
+      scrollContainerRef.current.scrollTop = Math.max(0, currentTimeTop - containerHeight / 2);
     }
   }, []);
 
