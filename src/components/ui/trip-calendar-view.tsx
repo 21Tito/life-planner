@@ -1582,7 +1582,7 @@ function CalendarGrid({
                               </span>
                             </div>
                             {activity.description && displayHeight >= 48 && !isDragging && (
-                              <span className="text-[9px] leading-snug opacity-70 mt-0.5 line-clamp-2">
+                              <span className="text-[9px] leading-snug opacity-70 mt-0.5">
                                 {activity.description}
                               </span>
                             )}
