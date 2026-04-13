@@ -892,15 +892,18 @@ function CalendarGrid({
     currentHour: number;
   } | null>(null);
 
-  // Scroll to current time (centered) on mount
+  // Scroll to current time (centered) on mount; keep time column in sync
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const timeColRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (scrollContainerRef.current) {
       const nowDate = new Date();
       const currentHourDecimal = nowDate.getHours() + nowDate.getMinutes() / 60;
       const currentTimeTop = (currentHourDecimal - START_HOUR) * HOUR_HEIGHT;
       const containerHeight = scrollContainerRef.current.clientHeight;
-      scrollContainerRef.current.scrollTop = Math.max(0, currentTimeTop - containerHeight / 2);
+      const scrollTop = Math.max(0, currentTimeTop - containerHeight / 2);
+      scrollContainerRef.current.scrollTop = scrollTop;
+      if (timeColRef.current) timeColRef.current.scrollTop = scrollTop;
     }
   }, []);
 
@@ -1387,61 +1390,66 @@ function CalendarGrid({
         </div>
       </div>
 
-      {/* ══ DATE HEADER + SCROLLABLE TIME BODY ══ */}
-      <div
-        ref={scrollContainerRef}
-        className="overflow-y-auto"
-        style={{ maxHeight: "calc(78vh - 70px)" }}
-      >
-      <div className="flex flex-col min-w-0">
-        {/* ══ STICKY DATE ROW (sticks to top while scrolling down) ══ */}
-        <div className="sticky top-0 z-20 flex bg-gray-50 border-b border-[var(--color-border)]">
-          <div
-            className="sticky left-0 z-10 bg-gray-50 border-r border-[var(--color-border)] flex-shrink-0"
-            style={{ width: TIME_COL_WIDTH }}
-          />
-          {days.map((day) => {
-            const d = new Date(day.date + "T00:00:00");
-            return (
+      {/* ══ TIME COLUMN (sticky left) + SCROLLABLE BODY ══ */}
+      <div className="flex" style={{ maxHeight: "calc(78vh - 70px)" }}>
+
+        {/* Time column — sticky left, scrollTop synced via JS */}
+        <div
+          ref={timeColRef}
+          className="sticky left-0 z-10 bg-white border-r border-[var(--color-border)] flex-shrink-0"
+          style={{ width: TIME_COL_WIDTH, overflowY: "hidden" }}
+        >
+          {/* Spacer matching the date header height */}
+          <div className="bg-gray-50 border-b border-[var(--color-border)]" style={{ height: 38 }} />
+          {/* Time labels */}
+          <div className="relative" style={{ height: TOTAL_HEIGHT }}>
+            {hours.map((hour) => (
               <div
-                key={day.id}
-                className="flex-1 border-r border-[var(--color-border)] last:border-r-0" style={{ minWidth: 100 }}
+                key={hour}
+                className="absolute w-full flex items-start justify-end pr-2 pt-1"
+                style={{ top: (hour - START_HOUR) * HOUR_HEIGHT }}
               >
-                <div className="flex flex-col items-center justify-center py-2 gap-0.5">
-                  <span className="text-[9px] font-semibold uppercase tracking-widest text-[var(--color-text-muted)]">
-                    {d.toLocaleDateString("en-US", { weekday: "short" })}
-                  </span>
-                  <span className="text-[11px] font-bold text-[var(--color-brand-600)] leading-none">
-                    {d.getMonth() + 1}/{d.getDate()}/{String(d.getFullYear()).slice(-2)}
-                  </span>
-                </div>
+                <span className="text-[9px] text-[var(--color-text-muted)] tabular-nums leading-none whitespace-nowrap">
+                  {formatHourLabel(hour)}
+                </span>
               </div>
-            );
-          })}
+            ))}
+          </div>
         </div>
 
-        {/* ══ SCROLLABLE BODY ══ */}
-        <div className="flex">
-
-          {/* Left time column (sticky left) */}
-          <div
-            className="sticky left-0 z-10 bg-white border-r border-[var(--color-border)] flex-shrink-0"
-            style={{ width: TIME_COL_WIDTH }}
-          >
-            <div className="relative" style={{ height: TOTAL_HEIGHT }}>
-              {hours.map((hour) => (
+        {/* Scrollable area — date header sticks, day columns scroll */}
+        <div
+          ref={scrollContainerRef}
+          className="overflow-y-auto flex-1"
+          onScroll={(e) => {
+            if (timeColRef.current) timeColRef.current.scrollTop = e.currentTarget.scrollTop;
+          }}
+        >
+        <div className="flex flex-col min-w-0">
+          {/* ══ STICKY DATE ROW ══ */}
+          <div className="sticky top-0 z-20 flex bg-gray-50 border-b border-[var(--color-border)]" style={{ height: 38 }}>
+            {days.map((day) => {
+              const d = new Date(day.date + "T00:00:00");
+              return (
                 <div
-                  key={hour}
-                  className="absolute w-full flex items-start justify-end pr-2 pt-1"
-                  style={{ top: (hour - START_HOUR) * HOUR_HEIGHT }}
+                  key={day.id}
+                  className="flex-1 border-r border-[var(--color-border)] last:border-r-0" style={{ minWidth: 100 }}
                 >
-                  <span className="text-[9px] text-[var(--color-text-muted)] tabular-nums leading-none whitespace-nowrap">
-                    {formatHourLabel(hour)}
-                  </span>
+                  <div className="flex flex-col items-center justify-center py-2 gap-0.5">
+                    <span className="text-[9px] font-semibold uppercase tracking-widest text-[var(--color-text-muted)]">
+                      {d.toLocaleDateString("en-US", { weekday: "short" })}
+                    </span>
+                    <span className="text-[11px] font-bold text-[var(--color-brand-600)] leading-none">
+                      {d.getMonth() + 1}/{d.getDate()}/{String(d.getFullYear()).slice(-2)}
+                    </span>
+                  </div>
                 </div>
-              ))}
-            </div>
+              );
+            })}
           </div>
+
+          {/* ══ SCROLLABLE BODY ══ */}
+          <div className="flex">
 
           {/* Day columns (time grids) */}
           <div className="flex flex-1 min-w-0">
@@ -1637,7 +1645,8 @@ function CalendarGrid({
 
         </div>
       </div>{/* end flex-col min-w-0 */}
-      </div>{/* end overflow-y-auto inner scroll */}
+      </div>{/* end overflow-y-auto scroll area */}
+      </div>{/* end time-col + scroll flex row */}
     </div>{/* end minWidth wrapper */}
     </div>
   );
