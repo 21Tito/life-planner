@@ -85,9 +85,9 @@ const hours = Array.from(
   (_, i) => START_HOUR + i
 );
 
-// Time select options: 1 AM to 12 AM (midnight)
-const TIME_OPTIONS = Array.from({ length: 47 }, (_, i) => {
-  const totalMinutes = (i + 2) * 30; // start at 01:00, end at midnight
+// Time select options: 1 AM to 12 AM (midnight) in 15-minute increments
+const TIME_OPTIONS = Array.from({ length: 93 }, (_, i) => {
+  const totalMinutes = 60 + i * 15; // start at 01:00, step 15 min, end at midnight
   const hour = Math.floor(totalMinutes / 60) % 24;
   const minute = totalMinutes % 60;
   const value = `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
