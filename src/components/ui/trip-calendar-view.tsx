@@ -895,6 +895,8 @@ function CalendarGrid({
   // Scroll to current time (centered) on mount; keep time column in sync
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const timeColRef = useRef<HTMLDivElement>(null);
+  const cityGridRef = useRef<HTMLDivElement>(null);
+  const hotelGridRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (scrollContainerRef.current) {
       const nowDate = new Date();
@@ -905,6 +907,22 @@ function CalendarGrid({
       scrollContainerRef.current.scrollTop = scrollTop;
       if (timeColRef.current) timeColRef.current.scrollTop = scrollTop;
     }
+  }, []);
+
+  // Keep city/hotel grid widths in sync with the inner scroll container's content width
+  // (accounts for the vertical scrollbar width on desktop)
+  useEffect(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    const syncScrollbarGap = () => {
+      const w = el.offsetWidth - el.clientWidth;
+      if (cityGridRef.current) cityGridRef.current.style.paddingRight = `${w}px`;
+      if (hotelGridRef.current) hotelGridRef.current.style.paddingRight = `${w}px`;
+    };
+    syncScrollbarGap();
+    const ro = new ResizeObserver(syncScrollbarGap);
+    ro.observe(el);
+    return () => ro.disconnect();
   }, []);
 
   // Current time indicator — updates every minute
@@ -1303,7 +1321,7 @@ function CalendarGrid({
         >
           <span className="text-[9px] font-semibold text-[var(--color-text-muted)] uppercase tracking-wider">City</span>
         </div>
-        <div className="grid flex-1" style={{ gridTemplateColumns: `repeat(${days.length}, minmax(100px, 1fr))` }}>
+        <div ref={cityGridRef} className="grid flex-1" style={{ gridTemplateColumns: `repeat(${days.length}, minmax(100px, 1fr))`, boxSizing: "border-box" }}>
           {pageCitySpans.map((group, idx) => (
             <div
               key={idx}
@@ -1328,7 +1346,7 @@ function CalendarGrid({
         >
           <span className="text-[9px] font-semibold text-[var(--color-text-muted)] uppercase tracking-wider">Hotel</span>
         </div>
-        <div className="grid flex-1 relative" style={{ gridTemplateColumns: `repeat(${days.length}, minmax(100px, 1fr))` }}>
+        <div ref={hotelGridRef} className="grid flex-1 relative" style={{ gridTemplateColumns: `repeat(${days.length}, minmax(100px, 1fr))`, boxSizing: "border-box" }}>
           {/* Hotel spans */}
           {pageHotelSpans.map(({ hotel, startIdx, span }) => (
             <div
@@ -1391,13 +1409,13 @@ function CalendarGrid({
       </div>
 
       {/* ══ TIME COLUMN (sticky left) + SCROLLABLE BODY ══ */}
-      <div className="flex" style={{ maxHeight: "calc(78vh - 70px)" }}>
+      <div className="flex">
 
         {/* Time column — sticky left, scrollTop synced via JS */}
         <div
           ref={timeColRef}
           className="sticky left-0 z-10 bg-white border-r border-[var(--color-border)] flex-shrink-0"
-          style={{ width: TIME_COL_WIDTH, overflowY: "hidden" }}
+          style={{ width: TIME_COL_WIDTH, overflowY: "hidden", height: "calc(78vh - 70px)" }}
         >
           {/* Spacer matching the date header height */}
           <div className="bg-gray-50 border-b border-[var(--color-border)]" style={{ height: 38 }} />
@@ -1421,19 +1439,20 @@ function CalendarGrid({
         <div
           ref={scrollContainerRef}
           className="overflow-y-auto flex-1"
+          style={{ maxHeight: "calc(78vh - 70px)" }}
           onScroll={(e) => {
             if (timeColRef.current) timeColRef.current.scrollTop = e.currentTarget.scrollTop;
           }}
         >
         <div className="flex flex-col min-w-0">
           {/* ══ STICKY DATE ROW ══ */}
-          <div className="sticky top-0 z-20 flex bg-gray-50 border-b border-[var(--color-border)]" style={{ height: 38 }}>
+          <div className="sticky top-0 z-20 bg-gray-50 border-b border-[var(--color-border)]" style={{ height: 38, display: "grid", gridTemplateColumns: `repeat(${days.length}, minmax(100px, 1fr))` }}>
             {days.map((day) => {
               const d = new Date(day.date + "T00:00:00");
               return (
                 <div
                   key={day.id}
-                  className="flex-1 border-r border-[var(--color-border)] last:border-r-0" style={{ minWidth: 100 }}
+                  className="border-r border-[var(--color-border)] last:border-r-0"
                 >
                   <div className="flex flex-col items-center justify-center py-2 gap-0.5">
                     <span className="text-[9px] font-semibold uppercase tracking-widest text-[var(--color-text-muted)]">
@@ -1449,16 +1468,14 @@ function CalendarGrid({
           </div>
 
           {/* ══ SCROLLABLE BODY ══ */}
-          <div className="flex">
-
           {/* Day columns (time grids) */}
-          <div className="flex flex-1 min-w-0">
+          <div style={{ display: "grid", gridTemplateColumns: `repeat(${days.length}, minmax(100px, 1fr))` }}>
             {days.map((day) => {
               const activities = day.trip_activities ?? [];
               return (
                 <div
                   key={day.id}
-                  className="flex-1 border-r border-[var(--color-border)] last:border-r-0" style={{ minWidth: 100 }}
+                  className="border-r border-[var(--color-border)] last:border-r-0"
                 >
 
                   {/* Time grid */}
@@ -1642,8 +1659,6 @@ function CalendarGrid({
               );
             })}
           </div>
-
-        </div>
       </div>{/* end flex-col min-w-0 */}
       </div>{/* end overflow-y-auto scroll area */}
       </div>{/* end time-col + scroll flex row */}
