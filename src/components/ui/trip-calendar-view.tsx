@@ -1328,18 +1328,36 @@ function CalendarGrid({
         <div className="grid flex-1 relative" style={{ gridTemplateColumns: `repeat(${days.length}, minmax(100px, 1fr))` }}>
           {/* Hotel spans */}
           {pageHotelSpans.map(({ hotel, startIdx, span }) => (
-            <button
+            <div
               key={hotel.id}
-              onClick={() => onHotelClick?.(hotel)}
-              className="flex items-center px-2 gap-1.5 bg-orange-100 hover:bg-orange-200 transition-colors border-r border-[var(--color-border)] truncate"
+              className="flex items-center justify-center px-2 gap-1.5 bg-orange-100 border-r border-[var(--color-border)] overflow-hidden"
               style={{ gridColumn: `${startIdx + 1} / span ${span}` }}
-              title={hotel.name}
             >
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-orange-500 shrink-0">
-                <path d="M3 22V7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v15" /><path d="M6 22v-4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v4" /><rect width="4" height="4" x="10" y="11" />
-              </svg>
-              <span className="text-xs font-medium text-orange-800 truncate">{hotel.name}</span>
-            </button>
+              <button
+                onClick={() => onHotelClick?.(hotel)}
+                className="flex items-center gap-1.5 min-w-0 hover:opacity-70 transition-opacity"
+                title={hotel.name}
+              >
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-orange-500 shrink-0">
+                  <path d="M3 22V7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v15" /><path d="M6 22v-4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v4" /><rect width="4" height="4" x="10" y="11" />
+                </svg>
+                <span className="text-xs font-medium text-orange-800 truncate">{hotel.name}</span>
+              </button>
+              {hotel.maps_url && (
+                <a
+                  href={hotel.maps_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  className="shrink-0 text-orange-400 hover:text-orange-600 transition-colors"
+                  title="Open in Maps"
+                >
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" /><circle cx="12" cy="10" r="3" />
+                  </svg>
+                </a>
+              )}
+            </div>
           ))}
           {/* Empty cells for uncovered columns */}
           {(() => {
