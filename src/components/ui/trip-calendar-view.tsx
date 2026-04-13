@@ -807,6 +807,60 @@ function TimezoneSelector({
   );
 }
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function formatDateRange(start: string, end: string) {
+  const fmt = (d: string) =>
+    new Date(d + "T00:00:00").toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+    });
+  return start === end ? fmt(start) : `${fmt(start)} – ${fmt(end)}`;
+}
+
+function CityPill({
+  city,
+  dateRange,
+  onSave,
+}: {
+  city: string;
+  dateRange: string;
+  onSave: (v: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(city);
+
+  if (editing) {
+    return (
+      <input
+        autoFocus
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onBlur={() => {
+          onSave(value);
+          setEditing(false);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") { onSave(value); setEditing(false); }
+          if (e.key === "Escape") { setValue(city); setEditing(false); }
+        }}
+        className="px-2.5 py-1 text-xs rounded-full border border-[var(--color-brand-600)] outline-none text-[var(--color-brand-700)] bg-[var(--color-brand-50)]"
+        style={{ width: Math.max(value.length * 8 + 16, 72) }}
+      />
+    );
+  }
+
+  return (
+    <button
+      onClick={() => { setValue(city); setEditing(true); }}
+      className="flex items-center gap-1.5 px-2.5 py-1 bg-[var(--color-brand-50)] border border-[var(--color-brand-200)] rounded-full text-xs text-[var(--color-brand-700)] hover:bg-[var(--color-brand-100)] transition-colors"
+    >
+      <span className="font-medium">{city}</span>
+      <span className="text-[10px] text-[var(--color-brand-400)]">{dateRange}</span>
+    </button>
+  );
+}
+
 // ─── Calendar grid ────────────────────────────────────────────────────────────
 
 function CalendarGrid({
@@ -814,9 +868,9 @@ function CalendarGrid({
   hotels,
   onCellClick,
   onActivityEdit,
-  onUpdateDayField,
   onActivityTimeUpdate,
   onActivityDayUpdate,
+  onUpdateDayField,
   onHotelClick,
   onAddHotel,
 }: {
@@ -824,11 +878,11 @@ function CalendarGrid({
   hotels: TripHotel[];
   onCellClick?: (dayId: string, dayDate: string, startHour: number, endHour: number) => void;
   onActivityEdit?: (activity: TripActivity, dayId: string) => void;
-  onUpdateDayField?: (dayId: string, field: "title" | "notes", value: string) => void;
   onActivityTimeUpdate?: (activityId: string, dayId: string, startTime: string, endTime: string) => void;
   onActivityDayUpdate?: (activityId: string, fromDayId: string, toDayId: string, startTime: string, endTime: string) => void;
+  onUpdateDayField?: (dayId: string, field: "title" | "notes", value: string) => void;
   onHotelClick?: (hotel: TripHotel) => void;
-  onAddHotel?: (date: string) => void;
+  onAddHotel?: () => void;
 }) {
   // Drag-to-select (create) state
   const [dragState, setDragState] = useState<{
@@ -1197,12 +1251,130 @@ function CalendarGrid({
     }
   }
 
+  // ── City spans (consecutive same-city days merged) ──
+  const pageCitySpans: { city: string | null; span: number; startIdx: number; dayIds: string[] }[] = [];
+  for (let i = 0; i < days.length; i++) {
+    const city = days[i].title ?? null;
+    const last = pageCitySpans[pageCitySpans.length - 1];
+    // Only merge consecutive days that share the same non-null city
+    if (city !== null && last && last.city === city) {
+      last.span += 1;
+      last.dayIds.push(days[i].id);
+    } else {
+      pageCitySpans.push({ city, span: 1, startIdx: i, dayIds: [days[i].id] });
+    }
+  }
+
+  // ── Hotel spans (intersect hotel date range with visible days) ──
+  const pageHotelSpans: { hotel: TripHotel; startIdx: number; span: number }[] = [];
+  for (const hotel of hotels) {
+    let startIdx = -1, endIdx = -1;
+    for (let i = 0; i < days.length; i++) {
+      const d = days[i].date;
+      if (d >= hotel.check_in_date && d <= hotel.check_out_date) {
+        if (startIdx === -1) startIdx = i;
+        endIdx = i;
+      }
+    }
+    if (startIdx !== -1) pageHotelSpans.push({ hotel, startIdx, span: endIdx - startIdx + 1 });
+  }
+  // Build set of column indices covered by a hotel
+  const hotelCoveredCols = new Set<number>();
+  pageHotelSpans.forEach(({ startIdx, span }) => {
+    for (let i = startIdx; i < startIdx + span; i++) hotelCoveredCols.add(i);
+  });
+
+  const gridCols = `${TIME_COL_WIDTH}px repeat(${days.length}, minmax(100px, 1fr))`;
+
   return (
     <div
-      ref={scrollContainerRef}
-      className="overflow-auto rounded-xl border border-[var(--color-border)] bg-white w-full min-w-0"
-      style={{ maxHeight: "78vh" }}
+      className="overflow-x-auto rounded-xl border border-[var(--color-border)] bg-white w-full min-w-0"
     >
+    <div style={{ minWidth: days.length * 100 + TIME_COL_WIDTH }}>
+
+      {/* ══ CITY ROW ══ */}
+      <div className="flex border-b border-[var(--color-border)] bg-white" style={{ height: 34 }}>
+        <div
+          className="sticky left-0 z-10 bg-white border-r border-[var(--color-border)] flex-shrink-0 flex items-center justify-end pr-2"
+          style={{ width: TIME_COL_WIDTH }}
+        >
+          <span className="text-[9px] font-semibold text-[var(--color-text-muted)] uppercase tracking-wider">City</span>
+        </div>
+        <div className="grid flex-1" style={{ gridTemplateColumns: `repeat(${days.length}, minmax(100px, 1fr))` }}>
+          {pageCitySpans.map((group, idx) => (
+            <div
+              key={idx}
+              className="border-r border-[var(--color-border)] last:border-r-0"
+              style={{ gridColumn: `${group.startIdx + 1} / span ${group.span}` }}
+            >
+              <InlineEditCell
+                value={group.city}
+                placeholder="Add city…"
+                onSave={(v) => group.dayIds.forEach((id) => onUpdateDayField?.(id, "title", v))}
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ══ HOTEL ROW ══ */}
+      <div className="flex border-b border-[var(--color-border)]" style={{ backgroundColor: "rgb(255 247 237 / 0.6)", height: 36 }}>
+        <div
+          className="sticky left-0 z-10 border-r border-[var(--color-border)] flex-shrink-0 flex items-center justify-end pr-2"
+          style={{ width: TIME_COL_WIDTH, backgroundColor: "rgb(255 247 237 / 0.6)" }}
+        >
+          <span className="text-[9px] font-semibold text-[var(--color-text-muted)] uppercase tracking-wider">Hotel</span>
+        </div>
+        <div className="grid flex-1 relative" style={{ gridTemplateColumns: `repeat(${days.length}, minmax(100px, 1fr))` }}>
+          {/* Hotel spans */}
+          {pageHotelSpans.map(({ hotel, startIdx, span }) => (
+            <button
+              key={hotel.id}
+              onClick={() => onHotelClick?.(hotel)}
+              className="flex items-center px-2 gap-1.5 bg-orange-100 hover:bg-orange-200 transition-colors border-r border-[var(--color-border)] truncate"
+              style={{ gridColumn: `${startIdx + 1} / span ${span}` }}
+              title={hotel.name}
+            >
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-orange-500 shrink-0">
+                <path d="M3 22V7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v15" /><path d="M6 22v-4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v4" /><rect width="4" height="4" x="10" y="11" />
+              </svg>
+              <span className="text-xs font-medium text-orange-800 truncate">{hotel.name}</span>
+            </button>
+          ))}
+          {/* Empty cells for uncovered columns */}
+          {(() => {
+            const empties: React.ReactNode[] = [];
+            let i = 0;
+            while (i < days.length) {
+              if (!hotelCoveredCols.has(i)) {
+                const start = i;
+                let span = 0;
+                while (i < days.length && !hotelCoveredCols.has(i)) { span++; i++; }
+                empties.push(
+                  <button
+                    key={`empty-${start}`}
+                    onClick={onAddHotel}
+                    className="flex items-center justify-center border-r border-[var(--color-border)] last:border-r-0 text-[10px] text-orange-300 hover:text-orange-500 hover:bg-orange-50 transition-colors"
+                    style={{ gridColumn: `${start + 1} / span ${span}` }}
+                  >
+                    + hotel
+                  </button>
+                );
+              } else {
+                i++;
+              }
+            }
+            return empties;
+          })()}
+        </div>
+      </div>
+
+      {/* ══ DATE HEADER + SCROLLABLE TIME BODY ══ */}
+      <div
+        ref={scrollContainerRef}
+        className="overflow-y-auto"
+        style={{ maxHeight: "calc(78vh - 70px)" }}
+      >
       <div className="flex flex-col min-w-0">
         {/* ══ STICKY DATE ROW (sticks to top while scrolling down) ══ */}
         <div className="sticky top-0 z-20 flex bg-gray-50 border-b border-[var(--color-border)]">
@@ -1225,97 +1397,6 @@ function CalendarGrid({
                     {d.getMonth() + 1}/{d.getDate()}/{String(d.getFullYear()).slice(-2)}
                   </span>
                 </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Row 2: City */}
-        <div className="flex bg-white border-b border-[var(--color-border)]" style={{ height: 34 }}>
-          <div
-            className="sticky left-0 z-10 bg-white border-r border-[var(--color-border)] flex-shrink-0 flex items-center justify-end pr-2"
-            style={{ width: TIME_COL_WIDTH }}
-          >
-            <span className="text-[9px] font-semibold text-[var(--color-text-muted)] uppercase tracking-wider">
-              City
-            </span>
-          </div>
-          {days.map((day) => (
-            <div
-              key={day.id}
-              className="flex-1 border-r border-[var(--color-border)] last:border-r-0" style={{ minWidth: 100 }}
-            >
-              <InlineEditCell
-                value={day.title}
-                placeholder="Add city…"
-                onSave={(v) => onUpdateDayField?.(day.id, "title", v)}
-              />
-            </div>
-          ))}
-        </div>
-
-        {/* Row 3: Hotel */}
-        <div className="flex border-b border-[var(--color-border)]" style={{ backgroundColor: "rgb(255 247 237 / 0.5)", height: 38 }}>
-          <div
-            className="sticky left-0 z-10 border-r border-[var(--color-border)] flex-shrink-0 flex items-center justify-end pr-2"
-            style={{ width: TIME_COL_WIDTH, backgroundColor: "rgb(255 247 237 / 0.5)" }}
-          >
-            <span className="text-[9px] font-semibold text-[var(--color-text-muted)] uppercase tracking-wider">
-              Hotel
-            </span>
-          </div>
-          {days.map((day, idx) => {
-            const hotel = hotels.find(
-              (h) => h.check_in_date <= day.date && h.check_out_date >= day.date
-            );
-            const isStart = hotel?.check_in_date === day.date;
-            const nextDay = days[idx + 1];
-            const nextHasSameHotel =
-              hotel && nextDay && nextDay.date <= hotel.check_out_date;
-            return (
-              <div
-                key={day.id}
-                className="flex-1 last:border-r-0 relative flex items-center overflow-hidden"
-                style={{
-                  minWidth: 100,
-                  borderRight: nextHasSameHotel
-                    ? "1px solid transparent"
-                    : "1px solid var(--color-border)",
-                }}
-              >
-                {hotel ? (
-                  <button
-                    onClick={() => onHotelClick?.(hotel)}
-                    className="absolute inset-0 flex items-center px-2 gap-1.5 bg-orange-100 hover:bg-orange-200 transition-colors"
-                    title={hotel.name}
-                  >
-                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-orange-500 shrink-0">
-                      <path d="M3 22V7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v15" /><path d="M6 22v-4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v4" /><rect width="4" height="4" x="10" y="11" />
-                    </svg>
-                    <span className="text-xs font-medium text-orange-800 truncate">{hotel.name}</span>
-                    {hotel.maps_url && isStart && (
-                      <a
-                        href={hotel.maps_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        className="ml-auto shrink-0 text-orange-400 hover:text-orange-600 transition-colors"
-                        title="Open in Maps"
-                      >
-                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" /><circle cx="12" cy="10" r="3" />
-                        </svg>
-                      </a>
-                    )}
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => onAddHotel?.(day.date)}
-                    className="w-full h-full flex items-center justify-center text-[10px] text-orange-300 hover:text-orange-500 hover:bg-orange-50 transition-colors"
-                  >
-                    + hotel
-                  </button>
-                )}
               </div>
             );
           })}
@@ -1537,7 +1618,9 @@ function CalendarGrid({
           </div>
 
         </div>
-      </div>
+      </div>{/* end flex-col min-w-0 */}
+      </div>{/* end overflow-y-auto inner scroll */}
+    </div>{/* end minWidth wrapper */}
     </div>
   );
 }
@@ -1889,12 +1972,12 @@ export function TripCalendarView({
       form: {
         title: activity.title,
         category: activity.category,
-        start_time:
-          activity.start_time ??
-          `${String(START_HOUR).padStart(2, "0")}:00`,
-        end_time:
-          activity.end_time ??
-          `${String(START_HOUR + 1).padStart(2, "0")}:00`,
+        start_time: activity.start_time
+          ? activity.start_time.slice(0, 5)
+          : `${String(START_HOUR).padStart(2, "0")}:00`,
+        end_time: activity.end_time
+          ? activity.end_time.slice(0, 5)
+          : `${String(START_HOUR + 1).padStart(2, "0")}:00`,
         date: day?.date ?? "",
         location: activity.location ?? "",
         description: activity.description ?? "",
@@ -2509,11 +2592,11 @@ export function TripCalendarView({
           hotels={hotels}
           onCellClick={openAddEditor}
           onActivityEdit={handleActivityTap}
-          onUpdateDayField={handleUpdateDayField}
           onActivityTimeUpdate={handleActivityTimeUpdate}
           onActivityDayUpdate={handleActivityDayUpdate}
+          onUpdateDayField={handleUpdateDayField}
           onHotelClick={(hotel) => setTappedHotel(hotel)}
-          onAddHotel={(date) => setHotelModal({ open: true, hotel: null, prefillDate: date })}
+          onAddHotel={() => setHotelModal({ open: true, hotel: null })}
         />
       ) : (
         <ListView days={days} />
