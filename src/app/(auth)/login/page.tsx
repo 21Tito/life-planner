@@ -9,7 +9,7 @@ function LoginForm() {
   const [loading, setLoading] = useState(false);
   const supabase = createClient();
   const searchParams = useSearchParams();
-  const redirectTo = searchParams.get("redirect") ?? "/dashboard";
+  const redirectTo = searchParams.get("redirect") ?? "/trips";
 
   async function signInWithGoogle() {
     setLoading(true);

@@ -7,7 +7,7 @@ export default function PrivacyPolicyPage() {
       <section className="mb-8">
         <h2 className="text-lg font-semibold mb-2">Overview</h2>
         <p className="text-gray-700">
-          Life Planner is a personal productivity app for planning trips and meals. This policy explains what data we collect, how we use it, and your rights. We take your privacy seriously and collect only what is necessary to provide the service.
+          Life Planner is a personal productivity app for planning trips. This policy explains what data we collect, how we use it, and your rights. We take your privacy seriously and collect only what is necessary to provide the service.
         </p>
       </section>
 
@@ -21,7 +21,7 @@ export default function PrivacyPolicyPage() {
             <strong>Google Calendar access</strong> — If you grant permission, we access your Google Calendar solely to create, update, and delete events corresponding to your trip activities. We do not read your existing calendar events.
           </li>
           <li>
-            <strong>Trip and meal data</strong> — Content you create in the app (trips, activities, meal plans) is stored in our database and associated with your account.
+            <strong>Trip data</strong> — Content you create in the app (trips, activities, hotels) is stored in our database and associated with your account.
           </li>
         </ul>
       </section>

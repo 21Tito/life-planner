@@ -29,7 +29,7 @@ export function AcceptInviteClient({
         setError(data.error ?? "Something went wrong");
         return;
       }
-      router.push("/dashboard");
+      router.push("/trips");
       router.refresh();
     } finally {
       setAccepting(false);
@@ -45,8 +45,7 @@ export function AcceptInviteClient({
         <h1 className="text-2xl font-bold mb-2">You&apos;re invited!</h1>
         <p className="text-muted-foreground text-sm mb-8">
           <span className="font-semibold text-foreground">{ownerName}</span>{" "}
-          has invited you to collaborate on their Life Planner — trips, meals,
-          and more.
+          has invited you to collaborate on their Life Planner trips.
         </p>
 
         {error && (
@@ -64,7 +63,7 @@ export function AcceptInviteClient({
         </Button>
 
         <p className="text-xs text-muted-foreground mt-4">
-          You&apos;ll be able to view and edit shared trips and meal plans.
+          You&apos;ll be able to view and edit shared trips.
         </p>
       </div>
     </div>

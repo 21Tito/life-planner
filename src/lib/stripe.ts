@@ -14,8 +14,8 @@ export async function createCheckoutSession(
     payment_method_types: ["card"],
     line_items: [{ price: priceId, quantity: 1 }],
     mode: "subscription",
-    success_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard?upgraded=true`,
-    cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard`,
+    success_url: `${process.env.NEXT_PUBLIC_APP_URL}/trips?upgraded=true`,
+    cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/trips`,
     metadata: { userId },
   });
 }
@@ -41,6 +41,6 @@ export async function createOrGetCustomer(
 export async function createBillingPortalSession(customerId: string) {
   return stripe.billingPortal.sessions.create({
     customer: customerId,
-    return_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard`,
+    return_url: `${process.env.NEXT_PUBLIC_APP_URL}/trips`,
   });
 }

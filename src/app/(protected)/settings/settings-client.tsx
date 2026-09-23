@@ -77,7 +77,7 @@ export function SettingsClient({ members, activeToken, isMember, ownerName }: Pr
         <Card className="mb-6">
           <CardContent className="py-5 px-5">
             <p className="text-sm text-muted-foreground">
-              You are a member of{ownerName ? ` ${ownerName}'s` : " someone else's"} household. You can see and edit their shared trips and meals.
+              You are a member of{ownerName ? ` ${ownerName}'s` : " someone else's"} household. You can see and edit their shared trips.
             </p>
           </CardContent>
         </Card>
@@ -129,7 +129,7 @@ export function SettingsClient({ members, activeToken, isMember, ownerName }: Pr
         Settings
       </h1>
       <p className="text-sm text-muted-foreground mb-8">
-        Invite people to collaborate on your trips and meal plans.
+        Invite people to collaborate on your trips.
       </p>
 
       {/* Invite section */}

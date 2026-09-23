@@ -8,11 +8,6 @@ import { Button } from "@/components/ui/button";
 
 const FEATURES = [
   {
-    icon: Icons.clipboard,
-    title: "Meal Planning",
-    description: "AI builds a weekly meal plan from whatever's in your fridge.",
-  },
-  {
     icon: Icons.map,
     title: "Trip Itineraries",
     description: "Day-by-day plans tailored to your interests and budget.",
@@ -31,7 +26,7 @@ export default function HomePage() {
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) router.push("/dashboard");
+      if (user) router.push("/trips");
     });
   }, []);
 
@@ -86,8 +81,7 @@ export default function HomePage() {
         </h1>
 
         <p className="max-w-sm lg:max-w-xl text-base lg:text-lg leading-7 lg:leading-8 text-muted-foreground mb-8 lg:mb-10">
-          AI-powered meal planning from what&apos;s in your fridge, and trip
-          itineraries that actually make sense.
+          AI-powered trip itineraries that actually make sense.
         </p>
 
         <Button
@@ -108,7 +102,7 @@ export default function HomePage() {
 
       {/* Features */}
       <div className="border-t border-border bg-card px-4 lg:px-6 py-12 lg:py-16 relative">
-        <div className="max-w-4xl mx-auto grid gap-8 grid-cols-1 sm:grid-cols-3">
+        <div className="max-w-4xl mx-auto grid gap-8 grid-cols-1 sm:grid-cols-2">
           {FEATURES.map(({ icon, title, description }) => (
             <div key={title} className="flex items-start gap-4 sm:flex-col sm:items-start sm:gap-3">
               <div className="w-10 h-10 rounded-lg bg-secondary flex items-center justify-center text-primary/70 flex-shrink-0">

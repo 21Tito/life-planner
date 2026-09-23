@@ -15,9 +15,7 @@ interface SidebarProps {
 }
 
 const navItems = [
-  { href: "/dashboard", label: "Dashboard",   icon: Icons.dashboard },
-  { href: "/meals",     label: "Meal Planner", icon: Icons.clipboard },
-  { href: "/trips",     label: "Trip Planner", icon: Icons.map },
+  { href: "/trips", label: "Trip Planner", icon: Icons.map },
 ];
 
 export function Sidebar({ user }: SidebarProps) {

@@ -7,7 +7,7 @@ const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
 export const metadata: Metadata = {
   title: "Life Planner",
-  description: "AI-powered meal planning and trip planning",
+  description: "AI-powered trip planning",
 };
 
 export default function RootLayout({

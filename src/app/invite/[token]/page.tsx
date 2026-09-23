@@ -61,7 +61,7 @@ export default async function InvitePage({
     .single();
 
   if (existing) {
-    redirect("/dashboard");
+    redirect("/trips");
   }
 
   return (
