@@ -5,6 +5,7 @@ import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { Trip } from "@/types";
+import { partitionTrips } from "@/lib/trips";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -198,6 +199,8 @@ export function TripsClient({ initialTrips }: Props) {
 
   const canSubmit =
     !!form.destination && !!dateRange.from && !!dateRange.to && !submitting;
+
+  const { upcoming, completed } = partitionTrips(trips);
 
   return (
     <div className="max-w-4xl">
@@ -442,50 +445,66 @@ export function TripsClient({ initialTrips }: Props) {
         </Card>
       )}
 
-      {/* Trip List */}
+      {/* Upcoming trips */}
       {trips.length === 0 && !showForm ? (
         <EmptyState
           icon={Icons.map}
           title="No trips planned yet"
           description='Hit "New Trip" to start planning your adventure.'
         />
-      ) : (
-        <div className="space-y-3">
-          {trips.map((trip) => (
-            <div key={trip.id} className="relative group">
-              <Link href={`/trips/${trip.id}`}>
-                <Card className="hover:ring-primary/30 hover:shadow-md transition-all cursor-pointer">
-                  <CardContent className="py-4 px-5">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-start gap-3 min-w-0 flex-1">
-                        <div className="w-9 h-9 rounded-lg bg-secondary flex items-center justify-center text-primary/70 flex-shrink-0 mt-0.5">
-                          {Icons.map}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2">
-                            <h3 className="font-semibold truncate">{trip.destination}</h3>
-                            <Badge variant="secondary" className="flex-shrink-0 text-xs">
-                              {tripDuration(trip.start_date, trip.end_date)}
-                            </Badge>
-                          </div>
-                          <p className="text-xs lg:text-sm text-muted-foreground mt-0.5">
-                            {formatDate(trip.start_date)} – {formatDate(trip.end_date)}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
-              {/* Menu sits outside the Link/Card so its dropdown isn't clipped */}
-              <div className="absolute right-2 top-1/2 -translate-y-1/2 z-10">
-                <TripMenu
-                  onEdit={() => openEditModal(trip)}
-                  onDelete={() => setDeletingTrip(trip)}
-                />
-              </div>
-            </div>
-          ))}
+      ) : upcoming.length === 0 && !showForm ? (
+        <EmptyState
+          icon={Icons.map}
+          title="No upcoming trips"
+          description="Finished trips are saved below in Completed trips."
+          className="py-10"
+        />
+      ) : upcoming.length > 0 ? (
+        <div>
+          {completed.length > 0 && (
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3 lg:mb-4">
+              Upcoming trips
+            </h2>
+          )}
+          <div className="space-y-3">
+            {upcoming.map((trip) => (
+              <TripRow
+                key={trip.id}
+                trip={trip}
+                formatDate={formatDate}
+                tripDuration={tripDuration}
+                onEdit={() => openEditModal(trip)}
+                onDelete={() => setDeletingTrip(trip)}
+              />
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {/* Completed trips — kept for later, hidden from Home after 7 days */}
+      {completed.length > 0 && (
+        <div className={upcoming.length > 0 || showForm ? "mt-10" : "mt-2"}>
+          <div className="mb-3 lg:mb-4">
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Completed trips
+            </h2>
+            <p className="text-xs text-muted-foreground mt-1">
+              These itineraries stay saved so you can look back anytime.
+            </p>
+          </div>
+          <div className="space-y-3">
+            {completed.map((trip) => (
+              <TripRow
+                key={trip.id}
+                trip={trip}
+                completed
+                formatDate={formatDate}
+                tripDuration={tripDuration}
+                onEdit={() => openEditModal(trip)}
+                onDelete={() => setDeletingTrip(trip)}
+              />
+            ))}
+          </div>
         </div>
       )}
 
@@ -585,6 +604,63 @@ export function TripsClient({ initialTrips }: Props) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function TripRow({
+  trip,
+  completed,
+  formatDate,
+  tripDuration,
+  onEdit,
+  onDelete,
+}: {
+  trip: Trip;
+  completed?: boolean;
+  formatDate: (dateStr: string) => string;
+  tripDuration: (start: string, end: string) => string;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  return (
+    <div className="relative group">
+      <Link href={`/trips/${trip.id}`}>
+        <Card
+          className={`hover:ring-primary/30 hover:shadow-md transition-all cursor-pointer ${
+            completed ? "opacity-80" : ""
+          }`}
+        >
+          <CardContent className="py-4 px-5">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start gap-3 min-w-0 flex-1">
+                <div className="w-9 h-9 rounded-lg bg-secondary flex items-center justify-center text-primary/70 flex-shrink-0 mt-0.5">
+                  {Icons.map}
+                </div>
+                <div className="min-w-0 flex-1 pr-8">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="font-semibold truncate">{trip.destination}</h3>
+                    <Badge variant="secondary" className="flex-shrink-0 text-xs">
+                      {tripDuration(trip.start_date, trip.end_date)}
+                    </Badge>
+                    {completed && (
+                      <Badge variant="outline" className="flex-shrink-0 text-xs">
+                        Completed
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="text-xs lg:text-sm text-muted-foreground mt-0.5">
+                    {formatDate(trip.start_date)} – {formatDate(trip.end_date)}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </Link>
+      <div className="absolute right-2 top-1/2 -translate-y-1/2 z-10">
+        <TripMenu onEdit={onEdit} onDelete={onDelete} />
+      </div>
     </div>
   );
 }

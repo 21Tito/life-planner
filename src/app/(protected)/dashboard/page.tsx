@@ -4,6 +4,8 @@ import Link from "next/link";
 import { StatCard } from "@/components/ui/stat-card";
 import { Icons } from "@/components/ui/icons";
 import { Card, CardContent } from "@/components/ui/card";
+import { partitionTrips } from "@/lib/trips";
+import type { Trip } from "@/types";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -24,7 +26,8 @@ export default async function DashboardPage() {
   ]);
 
   const mealCount = mealPlans?.length ?? 0;
-  const tripCount = trips?.length ?? 0;
+  const { upcoming: upcomingTrips } = partitionTrips((trips ?? []) as Trip[]);
+  const tripCount = upcomingTrips.length;
 
   return (
     <div className="max-w-4xl">
@@ -63,9 +66,9 @@ export default async function DashboardPage() {
           View all →
         </Link>
       </div>
-      {trips && trips.length > 0 ? (
+      {upcomingTrips.length > 0 ? (
         <div className="space-y-3">
-          {trips.map((trip) => (
+          {upcomingTrips.map((trip) => (
             <Link key={trip.id} href={`/trips/${trip.id}`} className="block">
               <Card className="hover:ring-primary/30 hover:shadow-md transition-all cursor-pointer">
                 <CardContent className="py-4 px-5">
@@ -90,7 +93,9 @@ export default async function DashboardPage() {
           <Card className="hover:ring-primary/30 hover:shadow-md transition-all cursor-pointer border-dashed">
             <CardContent className="py-6 px-5 flex items-center justify-center gap-2 text-muted-foreground">
               {Icons.map}
-              <span className="text-sm">Plan your first trip</span>
+              <span className="text-sm">
+                {trips && trips.length > 0 ? "No upcoming trips" : "Plan your first trip"}
+              </span>
             </CardContent>
           </Card>
         </Link>
