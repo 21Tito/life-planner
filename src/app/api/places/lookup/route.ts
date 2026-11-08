@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
+import { SafeFetchError, fetchPublicHtml } from "@/lib/safe-fetch";
 
 function extractNameFromUrl(url: string): string | null {
   try {
@@ -53,47 +55,54 @@ function extractNameFromHtml(html: string): string | null {
   return null;
 }
 
+/** Exact hostname (and path) check; a prefix match would accept maps.google.com.evil.com. */
+function isGoogleMapsUrl(raw: string): boolean {
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== "https:" && url.protocol !== "http:") return false;
+    if (url.username || url.password) return false;
+    const host = url.hostname.toLowerCase();
+    if (host === "maps.app.goo.gl" || host === "maps.google.com") return true;
+    if (host === "goo.gl" || host === "www.google.com" || host === "google.com") {
+      return url.pathname.startsWith("/maps");
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
 export async function GET(request: Request) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const { searchParams } = new URL(request.url);
   const mapsUrl = searchParams.get("url");
 
-  if (!mapsUrl) {
+  if (!mapsUrl || mapsUrl.length > 2048) {
     return NextResponse.json({ error: "url parameter required" }, { status: 400 });
   }
 
-  if (
-    !/^https?:\/\/(maps\.app\.goo\.gl|maps\.google\.com|www\.google\.com\/maps)/.test(
-      mapsUrl
-    )
-  ) {
+  if (!isGoogleMapsUrl(mapsUrl)) {
     return NextResponse.json({ error: "Not a Google Maps URL" }, { status: 400 });
   }
 
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 6000);
-
-    const response = await fetch(mapsUrl, {
-      signal: controller.signal,
-      redirect: "follow",
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        Accept: "text/html,application/xhtml+xml",
-        "Accept-Language": "en-US,en;q=0.9",
-      },
-    });
-
-    clearTimeout(timeout);
+    // Redirects are followed by the safe fetcher, which blocks private addresses on every hop
+    const { html, finalUrl } = await fetchPublicHtml(mapsUrl, { timeoutMs: 6000, maxBytes: 3_000_000 });
 
     // 1. Try to extract from the final (redirected) URL — fast, no HTML needed
-    const nameFromUrl = extractNameFromUrl(response.url);
+    const nameFromUrl = extractNameFromUrl(finalUrl);
     if (nameFromUrl) {
       return NextResponse.json({ name: nameFromUrl });
     }
 
     // 2. Fall back to parsing the page HTML
-    const html = await response.text();
     const nameFromHtml = extractNameFromHtml(html);
     if (nameFromHtml) {
       return NextResponse.json({ name: nameFromHtml });
@@ -104,7 +113,10 @@ export async function GET(request: Request) {
       { status: 422 }
     );
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Lookup failed";
-    return NextResponse.json({ error: message }, { status: 500 });
+    if (err instanceof SafeFetchError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
+    console.error("Place lookup failed:", err);
+    return NextResponse.json({ error: "Lookup failed" }, { status: 500 });
   }
 }

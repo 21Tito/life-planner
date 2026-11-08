@@ -18,6 +18,17 @@ export async function POST(request: Request) {
       );
     }
 
+    // The trip must be one this user can see (RLS covers household sharing)
+    const { data: trip } = await supabase
+      .from("trips")
+      .select("id")
+      .eq("id", tripId)
+      .eq("user_id", ownerId)
+      .maybeSingle();
+    if (!trip) {
+      return NextResponse.json({ error: "Trip not found" }, { status: 404 });
+    }
+
     // Use admin client to bypass RLS — ownerId may differ from auth.uid()
     // for household members, which would cause the user_id policy check to fail.
     const admin = createAdminClient(

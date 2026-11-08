@@ -1,5 +1,4 @@
 import { createClient } from "@/lib/supabase/server";
-import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 
 // DELETE ?memberId=xxx — owner removes a member from their household
@@ -21,6 +20,7 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: "memberId required" }, { status: 400 });
     }
 
+    // RLS limits this to the caller's own household
     const { error } = await supabase
       .from("household_members")
       .delete()
@@ -29,18 +29,9 @@ export async function DELETE(request: Request) {
 
     if (error) throw error;
 
-    // Clear the household_owner_id from the removed member's metadata
-    const admin = createAdminClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
-    await admin.auth.admin.updateUserById(memberId, {
-      user_metadata: { household_owner_id: null },
-    });
-
     return NextResponse.json({ ok: true });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Failed to remove member";
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("Remove member failed:", err);
+    return NextResponse.json({ error: "Failed to remove member" }, { status: 500 });
   }
 }

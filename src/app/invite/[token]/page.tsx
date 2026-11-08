@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { redirect } from "next/navigation";
 import { AcceptInviteClient } from "./accept-client";
 
@@ -9,22 +10,24 @@ export default async function InvitePage({
 }) {
   const { token } = await params;
   const supabase = await createClient();
+  const isValidToken = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(token);
 
-  // Must be logged in before we can read the invite (RLS requires auth)
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect(`/login?redirect=/invite/${token}`);
+    redirect(isValidToken ? `/login?redirect=/invite/${token}` : "/login");
   }
 
-  // Now look up the invite
-  const { data: invite } = await supabase
-    .from("household_invites")
-    .select("owner_id")
-    .eq("token", token)
-    .single();
+  // Invites aren't readable through RLS (the token is the secret), so look this one up server-side
+  const admin = createAdminClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+  const { data: invite } = isValidToken
+    ? await admin.from("household_invites").select("owner_id").eq("token", token).maybeSingle()
+    : { data: null };
 
   if (!invite) {
     return (
@@ -41,7 +44,7 @@ export default async function InvitePage({
   }
 
   // Fetch owner profile for display
-  const { data: ownerProfile } = await supabase
+  const { data: ownerProfile } = await admin
     .from("profiles")
     .select("full_name")
     .eq("id", invite.owner_id)

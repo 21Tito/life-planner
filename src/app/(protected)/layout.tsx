@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { Sidebar } from "@/components/layout/sidebar";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { HouseholdProvider } from "@/lib/household-context";
+import { getHouseholdOwnerId } from "@/lib/get-owner-id";
 
 export default async function ProtectedLayout({
   children,
@@ -17,15 +18,14 @@ export default async function ProtectedLayout({
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) redirect("/login");
 
-  const [{ data: { user } }, { data: profile }] = await Promise.all([
+  // Database queries are authorized by the JWT itself, so they can run alongside getUser()
+  const [{ data: { user } }, { data: profile }, ownerId] = await Promise.all([
     supabase.auth.getUser(),
     supabase.from("profiles").select("full_name, avatar_url").eq("id", session.user.id).single(),
+    getHouseholdOwnerId(supabase, session.user.id),
   ]);
 
-  if (!user) redirect("/login");
-
-  const ownerId =
-    (user.user_metadata?.household_owner_id as string | undefined) ?? user.id;
+  if (!user || user.id !== session.user.id) redirect("/login");
 
   return (
     <HouseholdProvider ownerId={ownerId}>

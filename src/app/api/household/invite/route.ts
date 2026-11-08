@@ -27,8 +27,8 @@ export async function POST() {
 
     return NextResponse.json({ token: invite.token });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Failed to create invite";
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("Create invite failed:", err);
+    return NextResponse.json({ error: "Failed to create invite" }, { status: 500 });
   }
 }
 

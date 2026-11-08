@@ -146,16 +146,3 @@ export interface MealPlanEntry {
   title: string;
   created_at: string;
 }
-
-// ===========================================
-// API request/response types
-// ===========================================
-
-export interface GenerateTripRequest {
-  destination: string;
-  start_date: string;
-  end_date: string;
-  interests?: string; // what they like to do
-  budget?: string; // rough budget
-  notes?: string;
-}

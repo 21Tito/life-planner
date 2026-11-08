@@ -1,12 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 /**
- * Returns { userId, ownerId } from the current Supabase session.
+ * Returns { userId, ownerId } for the signed-in user.
  *
- * `ownerId` is the effective owner for all data queries:
- *   - If the user accepted a household invite, it's the owner's ID
- *     (stored in user_metadata during invite acceptance — no DB query).
- *   - Otherwise it's the user's own ID.
+ * `ownerId` is the effective owner for all data queries: the household owner's ID if the
+ * user joined someone's household, otherwise their own. It comes from household_members,
+ * which only the server can write. Never derive it from user_metadata: users can edit
+ * their own metadata, and server routes that bypass RLS would then act on another account.
  *
  * Throws if no authenticated user is found.
  */
@@ -17,8 +17,14 @@ export async function getSessionIds(supabase: SupabaseClient) {
 
   if (!user) throw new Error("Unauthorized");
 
-  const ownerId =
-    (user.user_metadata?.household_owner_id as string | undefined) ?? user.id;
+  return { user, userId: user.id, ownerId: await getHouseholdOwnerId(supabase, user.id) };
+}
 
-  return { user, userId: user.id, ownerId };
+export async function getHouseholdOwnerId(supabase: SupabaseClient, userId: string): Promise<string> {
+  const { data } = await supabase
+    .from("household_members")
+    .select("owner_id")
+    .eq("member_id", userId)
+    .maybeSingle();
+  return data?.owner_id ?? userId;
 }
