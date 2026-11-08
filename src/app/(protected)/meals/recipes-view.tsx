@@ -4,7 +4,17 @@ import { createClient } from "@/lib/supabase/client";
 import { useState } from "react";
 import { useOwnerId } from "@/lib/household-context";
 import type { MealPlanEntry, PantryItem, RecipeIngredient, RecipeWithIngredients } from "@/types";
-import { findPantryMatch, formatIngredient, parseIngredientLines } from "@/lib/meals";
+import {
+  findPantryMatch,
+  formatIngredient,
+  guessEssential,
+  ingredientTokens,
+  parseIngredientLines,
+  recipeReadiness,
+} from "@/lib/meals";
+import type { ImportedRecipe } from "@/lib/recipe-import";
+import { cn } from "@/lib/utils";
+import { ReadinessText, StarIcon } from "./readiness";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -100,6 +110,8 @@ export function RecipesView({
 
     const parsed = parseIngredientLines(draft.ingredientsText);
     let ingredients: RecipeIngredient[] = existing?.recipe_ingredients ?? [];
+    // Edited lines keep their star when the ingredient itself is the same
+    const previousStars = new Map(ingredients.map((i) => [ingredientTokens(i.name).join(" "), i.is_essential]));
     const unchanged =
       existing &&
       parsed.length === ingredients.length &&
@@ -117,6 +129,9 @@ export function RecipesView({
               name: p.name,
               quantity: p.quantity,
               sort_order: i,
+              is_essential: existing
+                ? previousStars.get(ingredientTokens(p.name).join(" ")) ?? false
+                : guessEssential(p.name),
             }))
           )
           .select();
@@ -134,6 +149,34 @@ export function RecipesView({
 
     const saved: RecipeWithIngredients = { ...recipe, recipe_ingredients: ingredients };
     setRecipes((prev) => [...prev.filter((r) => r.id !== saved.id), saved].sort(byTitle));
+    // Show the new recipe so its pre-starred essentials can be reviewed
+    if (!existing) onOpenRecipe(saved.id);
+    return null;
+  }
+
+  async function toggleEssential(ing: RecipeIngredient): Promise<string | null> {
+    const setStar = (value: boolean) =>
+      setRecipes((prev) =>
+        prev.map((r) =>
+          r.id === ing.recipe_id
+            ? {
+                ...r,
+                recipe_ingredients: r.recipe_ingredients.map((i) =>
+                  i.id === ing.id ? { ...i, is_essential: value } : i
+                ),
+              }
+            : r
+        )
+      );
+    setStar(!ing.is_essential);
+    const { error } = await supabase
+      .from("recipe_ingredients")
+      .update({ is_essential: !ing.is_essential })
+      .eq("id", ing.id);
+    if (error) {
+      setStar(ing.is_essential);
+      return error.message;
+    }
     return null;
   }
 
@@ -176,6 +219,7 @@ export function RecipesView({
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {filtered.map((recipe) => {
                 const href = safeHref(recipe.source_url);
+                const readiness = recipeReadiness(recipe, pantry);
                 return (
                   <button key={recipe.id} onClick={() => onOpenRecipe(recipe.id)} className="text-left">
                     <Card className="h-full hover:ring-primary/30 hover:shadow-md transition-all">
@@ -186,6 +230,7 @@ export function RecipesView({
                           {recipe.recipe_ingredients.length === 1 ? "" : "s"}
                           {href && ` · ${hostname(href)}`}
                         </p>
+                        {readiness.status && <ReadinessText readiness={readiness} className="mt-2" />}
                       </CardContent>
                     </Card>
                   </button>
@@ -206,6 +251,7 @@ export function RecipesView({
           onClose={() => onOpenRecipe(null)}
           onEdit={() => setEditing(openRecipe)}
           onDelete={() => deleteRecipe(openRecipe)}
+          onToggleEssential={toggleEssential}
         />
       )}
 
@@ -226,16 +272,19 @@ function RecipeDetailModal({
   onClose,
   onEdit,
   onDelete,
+  onToggleEssential,
 }: {
   recipe: RecipeWithIngredients;
   pantry: PantryItem[];
   onClose: () => void;
   onEdit: () => void;
   onDelete: () => Promise<string | null>;
+  onToggleEssential: (ing: RecipeIngredient) => Promise<string | null>;
 }) {
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const href = safeHref(recipe.source_url);
+  const readiness = recipeReadiness(recipe, pantry);
 
   return (
     <Modal
@@ -280,28 +329,54 @@ function RecipeDetailModal({
         )}
 
         <section>
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
-            Ingredients
-          </h3>
+          <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 mb-1">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Ingredients
+            </h3>
+            {readiness.total > 0 && (
+              <ReadinessText readiness={readiness} showUnready />
+            )}
+          </div>
           {recipe.recipe_ingredients.length === 0 ? (
             <p className="text-muted-foreground">No ingredients listed.</p>
           ) : (
-            <ul className="space-y-1.5">
-              {recipe.recipe_ingredients.map((ing) => {
-                const inFridge = findPantryMatch(ing.name, pantry);
-                return (
-                  <li key={ing.id} className="flex items-start gap-2">
-                    <span
-                      className={inFridge ? "text-green-600 mt-0.5" : "text-muted-foreground/40 mt-0.5"}
-                      title={inFridge ? `In fridge: ${inFridge.name}` : "Not in fridge"}
-                    >
-                      {inFridge ? Icons.check : "•"}
-                    </span>
-                    <span>{formatIngredient(ing)}</span>
-                  </li>
-                );
-              })}
-            </ul>
+            <>
+              <p className="text-xs text-muted-foreground mb-2">
+                Star what this recipe can&apos;t do without, and it&apos;ll be suggested when those are in the
+                fridge. Write swaps with &ldquo;or&rdquo;, like &ldquo;chicken or pork&rdquo;.
+              </p>
+              <ul className="space-y-0.5">
+                {recipe.recipe_ingredients.map((ing) => {
+                  const inFridge = findPantryMatch(ing.name, pantry);
+                  return (
+                    <li key={ing.id} className="flex items-center gap-1.5">
+                      <button
+                        onClick={async () => {
+                          const err = await onToggleEssential(ing);
+                          setError(err);
+                        }}
+                        aria-pressed={ing.is_essential}
+                        aria-label={ing.is_essential ? `Unstar ${ing.name}` : `Star ${ing.name} as essential`}
+                        title={ing.is_essential ? "Essential" : "Mark as essential"}
+                        className={cn(
+                          "w-7 h-7 flex items-center justify-center rounded-md flex-shrink-0 transition-colors hover:bg-muted",
+                          ing.is_essential ? "text-amber-500" : "text-muted-foreground/40 hover:text-muted-foreground"
+                        )}
+                      >
+                        <StarIcon filled={ing.is_essential} />
+                      </button>
+                      <span
+                        className={cn("flex-shrink-0 w-4 flex justify-center", inFridge ? "text-green-600" : "text-muted-foreground/40")}
+                        title={inFridge ? `In fridge: ${inFridge.name}` : "Not in fridge"}
+                      >
+                        {inFridge ? Icons.check : "•"}
+                      </span>
+                      <span className={cn("py-1", ing.is_essential && "font-medium")}>{formatIngredient(ing)}</span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </>
           )}
         </section>
 
@@ -347,9 +422,50 @@ function RecipeFormModal({
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [importNote, setImportNote] = useState<string | null>(null);
 
   const set = (field: keyof RecipeDraft) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
     setDraft((d) => ({ ...d, [field]: e.target.value }));
+
+  async function importFromLink() {
+    const url = draft.source_url.trim();
+    if (!url || importing) return;
+    setImporting(true);
+    setError(null);
+    setImportNote(null);
+    try {
+      const res = await fetch("/api/recipes/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.recipe) {
+        setError(data.error ?? "Couldn't import that recipe.");
+        return;
+      }
+      const imported = data.recipe as ImportedRecipe;
+      // Ingredients and steps come from the page; a name or notes you've typed are kept
+      setDraft((d) => ({
+        ...d,
+        title: d.title.trim() ? d.title : imported.title,
+        ingredientsText: imported.ingredients.length ? imported.ingredients.join("\n") : d.ingredientsText,
+        instructions: imported.instructions || d.instructions,
+        notes: d.notes.trim() ? d.notes : imported.notes ?? "",
+      }));
+      const count = imported.ingredients.length;
+      setImportNote(
+        count
+          ? `Imported ${count} ingredient${count === 1 ? "" : "s"}. Review below, then save.`
+          : "Imported the recipe, but the page didn't list ingredients. Add them below."
+      );
+    } catch {
+      setError("Couldn't reach the server. Try again.");
+    } finally {
+      setImporting(false);
+    }
+  }
 
   async function save() {
     if (!draft.title.trim()) return;
@@ -377,21 +493,45 @@ function RecipeFormModal({
     >
       <div className="space-y-4">
         <div>
+          <FieldLabel optional>Recipe link</FieldLabel>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              importFromLink();
+            }}
+            className="flex gap-2"
+          >
+            <Input
+              value={draft.source_url}
+              onChange={set("source_url")}
+              placeholder="https://…"
+              inputMode="url"
+              className="h-10 text-sm"
+            />
+            <Button
+              type="submit"
+              variant="outline"
+              disabled={!draft.source_url.trim() || importing}
+              className="h-10 gap-1.5 flex-shrink-0"
+            >
+              {Icons.download}
+              {importing ? "Importing…" : "Import"}
+            </Button>
+          </form>
+          {importNote ? (
+            <p className="text-xs text-green-700 mt-1">{importNote}</p>
+          ) : (
+            <p className="text-xs text-muted-foreground mt-1">
+              Paste a link and hit Import to fill in the ingredients and steps.
+            </p>
+          )}
+        </div>
+        <div>
           <FieldLabel>Name</FieldLabel>
           <Input
             value={draft.title}
             onChange={set("title")}
             placeholder="e.g. Mediterranean turkey bowls"
-            className="h-10 text-sm"
-          />
-        </div>
-        <div>
-          <FieldLabel optional>Recipe link</FieldLabel>
-          <Input
-            value={draft.source_url}
-            onChange={set("source_url")}
-            placeholder="https://…"
-            inputMode="url"
             className="h-10 text-sm"
           />
         </div>

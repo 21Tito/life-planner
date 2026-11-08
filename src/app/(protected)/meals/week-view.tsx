@@ -9,7 +9,9 @@ import {
   addDays,
   buildShoppingList,
   guessCategory,
+  recipeReadiness,
   startOfWeek,
+  suggestRecipes,
   toDateStr,
   weekDates,
   type ShoppingLine,
@@ -20,6 +22,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Icons } from "@/components/ui/icons";
 import { cn } from "@/lib/utils";
 import { ErrorText, FieldLabel, Modal } from "./modal";
+import { ReadinessText } from "./readiness";
 import type { MealsTab } from "./meals-client";
 
 interface Props {
@@ -73,6 +76,8 @@ export function WeekView({
   const isThisWeek = from <= todayStr && todayStr <= toDateStr(addDays(weekStart, 6));
 
   const editingEntry = editingSlot ? entryFor(editingSlot.date, editingSlot.slot) : undefined;
+  const plannedIds = new Set(weekEntries.flatMap((e) => (e.recipe_id ? [e.recipe_id] : [])));
+  const openDinner = days.map(toDateStr).find((d) => d >= todayStr && !entryFor(d, "dinner"));
 
   return (
     <div>
@@ -104,6 +109,15 @@ export function WeekView({
         )}
         {loading && <span className="text-xs text-muted-foreground">Loading…</span>}
       </div>
+
+      <Suggestions
+        recipes={recipes}
+        pantry={pantry}
+        plannedIds={plannedIds}
+        openDinner={openDinner}
+        setEntries={setEntries}
+        onOpenRecipe={onOpenRecipe}
+      />
 
       {/* Day grid */}
       <div className={cn("grid gap-3 lg:grid-cols-5", loading && "opacity-60")}>
@@ -172,6 +186,7 @@ export function WeekView({
           slot={editingSlot.slot}
           entry={editingEntry}
           recipes={recipes}
+          pantry={pantry}
           onClose={() => setEditingSlot(null)}
           setEntries={setEntries}
           onOpenRecipe={onOpenRecipe}
@@ -182,13 +197,133 @@ export function WeekView({
   );
 }
 
+type SupabaseBrowser = ReturnType<typeof createClient>;
+
+function upsertEntry(supabase: SupabaseBrowser, values: Omit<MealPlanEntry, "id" | "created_at">) {
+  return supabase
+    .from("meal_plan_entries")
+    .upsert(values, { onConflict: "user_id,date,slot" })
+    .select()
+    .single();
+}
+
+// ── Recipes you can make from the fridge ─────────────────────────────────────
+
+const SUGGESTIONS_SHOWN = 4;
+
+function Suggestions({
+  recipes,
+  pantry,
+  plannedIds,
+  openDinner,
+  setEntries,
+  onOpenRecipe,
+}: {
+  recipes: RecipeWithIngredients[];
+  pantry: PantryItem[];
+  plannedIds: Set<string>;
+  openDinner: string | undefined;
+  setEntries: React.Dispatch<React.SetStateAction<MealPlanEntry[]>>;
+  onOpenRecipe: (id: string) => void;
+}) {
+  const supabase = createClient();
+  const ownerId = useOwnerId();
+  const [showAll, setShowAll] = useState(false);
+  const [adding, setAdding] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  if (recipes.length === 0) return null;
+
+  const suggestions = suggestRecipes(recipes, pantry, plannedIds).filter((s) => !s.planned);
+  const shown = showAll ? suggestions : suggestions.slice(0, SUGGESTIONS_SHOWN);
+  const anyStarred = recipes.some((r) => r.recipe_ingredients.some((i) => i.is_essential));
+  const openDay = openDinner
+    ? new Date(`${openDinner}T00:00:00`).toLocaleDateString("en-US", { weekday: "short" })
+    : null;
+
+  async function plan(recipe: RecipeWithIngredients) {
+    if (!openDinner) return;
+    setAdding(recipe.id);
+    setError(null);
+    const { data, error } = await upsertEntry(supabase, {
+      user_id: ownerId,
+      date: openDinner,
+      slot: "dinner",
+      recipe_id: recipe.id,
+      title: recipe.title,
+    });
+    setAdding(null);
+    if (error || !data) {
+      setError(error?.message ?? "Couldn't add that meal.");
+      return;
+    }
+    setEntries((prev) => [
+      ...prev.filter((e) => !(e.date === openDinner && e.slot === "dinner")),
+      data as MealPlanEntry,
+    ]);
+  }
+
+  return (
+    <section className="mb-5">
+      <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+        You can make
+      </h2>
+      {suggestions.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          {anyStarred
+            ? "Nothing's ready with what's in your fridge right now."
+            : "Star the key ingredients in your recipes, and meals you can make from the fridge will show up here."}
+        </p>
+      ) : (
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+          {shown.map((s) => (
+            <div
+              key={s.recipe.id}
+              className="rounded-xl ring-1 ring-foreground/10 bg-card pl-3 pr-2 py-2 flex items-center gap-2"
+            >
+              <button onClick={() => onOpenRecipe(s.recipe.id)} className="flex-1 min-w-0 text-left">
+                <p className="text-sm font-medium truncate">{s.recipe.title}</p>
+                <ReadinessText readiness={s} />
+              </button>
+              {openDay && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => plan(s.recipe)}
+                  disabled={adding === s.recipe.id}
+                  title={`Plan for ${openDay} dinner`}
+                  className="flex-shrink-0"
+                >
+                  + {openDay}
+                </Button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+      {suggestions.length > SUGGESTIONS_SHOWN && (
+        <button
+          onClick={() => setShowAll(!showAll)}
+          className="mt-2 text-sm text-primary font-medium hover:underline"
+        >
+          {showAll ? "Show fewer" : `Show all ${suggestions.length}`}
+        </button>
+      )}
+      {error && <div className="mt-2"><ErrorText>{error}</ErrorText></div>}
+    </section>
+  );
+}
+
 // ── Pick a recipe or write a note for one slot ───────────────────────────────
+
+const STATUS_RANK = { ready: 0, almost: 1 } as const;
 
 function SlotModal({
   date,
   slot,
   entry,
   recipes,
+  pantry,
   onClose,
   setEntries,
   onOpenRecipe,
@@ -198,6 +333,7 @@ function SlotModal({
   slot: MealSlot;
   entry: MealPlanEntry | undefined;
   recipes: RecipeWithIngredients[];
+  pantry: PantryItem[];
   onClose: () => void;
   setEntries: React.Dispatch<React.SetStateAction<MealPlanEntry[]>>;
   onOpenRecipe: (id: string) => void;
@@ -216,17 +352,21 @@ function SlotModal({
     day: "numeric",
   });
   const query = search.trim().toLowerCase();
-  const matches = recipes.filter((r) => r.title.toLowerCase().includes(query));
+  // Recipes you can make from the fridge are listed first
+  const ranked = recipes
+    .map((recipe) => ({ recipe, readiness: recipeReadiness(recipe, pantry) }))
+    .sort((a, b) => {
+      const ra = a.readiness.status ? STATUS_RANK[a.readiness.status] : 2;
+      const rb = b.readiness.status ? STATUS_RANK[b.readiness.status] : 2;
+      return ra - rb || a.recipe.title.localeCompare(b.recipe.title);
+    });
+  const matches = ranked.filter(({ recipe }) => recipe.title.toLowerCase().includes(query));
   const linkedRecipe = entry?.recipe_id ? recipes.find((r) => r.id === entry.recipe_id) : undefined;
 
   async function save(recipe_id: string | null, title: string) {
     setSaving(true);
     setError(null);
-    const { data, error } = await supabase
-      .from("meal_plan_entries")
-      .upsert({ user_id: ownerId, date, slot, recipe_id, title }, { onConflict: "user_id,date,slot" })
-      .select()
-      .single();
+    const { data, error } = await upsertEntry(supabase, { user_id: ownerId, date, slot, recipe_id, title });
     setSaving(false);
     if (error || !data) {
       setError(error?.message ?? "Couldn't save this meal.");
@@ -305,19 +445,21 @@ function SlotModal({
                 />
               )}
               <ul className="max-h-60 overflow-y-auto rounded-lg ring-1 ring-foreground/10 divide-y divide-border">
-                {matches.map((r) => (
+                {matches.map(({ recipe: r, readiness }) => (
                   <li key={r.id}>
                     <button
                       onClick={() => save(r.id, r.title)}
                       disabled={saving}
                       className={cn(
-                        "w-full text-left px-3 py-2.5 text-sm hover:bg-muted transition-colors flex items-center justify-between gap-2",
+                        "w-full text-left px-3 py-2.5 text-sm hover:bg-muted transition-colors flex items-center justify-between gap-3",
                         entry?.recipe_id === r.id && "bg-secondary font-medium"
                       )}
                     >
                       <span className="truncate">{r.title}</span>
-                      {entry?.recipe_id === r.id && (
+                      {entry?.recipe_id === r.id ? (
                         <span className="text-primary flex-shrink-0">{Icons.check}</span>
+                      ) : (
+                        <ReadinessText readiness={readiness} className="flex-shrink-0 max-w-[50%]" />
                       )}
                     </button>
                   </li>

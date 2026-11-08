@@ -128,6 +128,7 @@ export interface RecipeIngredient {
   name: string;
   quantity: string | null;
   sort_order: number;
+  is_essential: boolean;
 }
 
 export type RecipeWithIngredients = Recipe & {

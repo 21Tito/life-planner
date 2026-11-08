@@ -85,32 +85,82 @@ function singular(word: string): string {
   return word;
 }
 
-/** "Boneless chicken breasts, cubed (about 2)" → ["chicken", "breast"] */
-export function ingredientTokens(name: string): string[] {
-  const core = name.toLowerCase().split(",")[0].replace(/\([^)]*\)/g, " ");
-  return core
+function meaningfulWords(text: string): string[] {
+  return text
+    .toLowerCase()
     .replace(/[^a-z\s]/g, " ")
     .split(/\s+/)
-    .filter((w) => w && !IGNORED_WORDS.has(w))
-    .map(singular);
+    .filter((w) => w && !IGNORED_WORDS.has(w));
 }
+
+/**
+ * The part before prep notes: "chicken breast, cubed" → "chicken breast".
+ * Keeps leading descriptor-only segments, as in "boneless, skinless chicken breast".
+ */
+function coreName(name: string): string {
+  let core = "";
+  for (const segment of name.replace(/\([^)]*\)/g, " ").split(",")) {
+    core = core ? `${core} ${segment}` : segment;
+    if (meaningfulWords(core).length > 0) break;
+  }
+  return core.replace(/\s+/g, " ").trim();
+}
+
+/** "Boneless chicken breasts, cubed (about 2)" → ["chicken", "breast"] */
+export function ingredientTokens(name: string): string[] {
+  return meaningfulWords(coreName(name)).map(singular);
+}
+
+// Cuts and forms of the same ingredient: "chicken breast" in the fridge works for "chicken thighs"
+const CUT_WORDS = new Set([
+  "breast", "thigh", "leg", "drumstick", "wing", "tender", "tenderloin", "cutlet", "fillet",
+  "filet", "loin", "shoulder", "chop", "rib", "belly", "butt", "sirloin", "flank", "strip",
+  "steak", "ground", "mince", "piece", "whole",
+]);
+
+// Products made from an ingredient: "chicken" in the fridge doesn't cover "chicken broth"
+const PRODUCT_WORDS = new Set([
+  "broth", "stock", "bouillon", "sauce", "powder", "seasoning", "paste", "oil", "vinegar",
+  "extract", "cube", "flake",
+]);
 
 function tokensMatch(a: string[], b: string[]): boolean {
   if (!a.length || !b.length) return false;
-  const setA = new Set(a);
-  const setB = new Set(b);
-  return a.every((t) => setB.has(t)) || b.every((t) => setA.has(t));
+
+  const productsA = a.filter((t) => PRODUCT_WORDS.has(t)).sort().join(" ");
+  const productsB = b.filter((t) => PRODUCT_WORDS.has(t)).sort().join(" ");
+  if (productsA !== productsB) return false;
+
+  const withoutCuts = (tokens: string[]) => {
+    const kept = tokens.filter((t) => !CUT_WORDS.has(t));
+    return kept.length ? kept : tokens;
+  };
+  const coreA = withoutCuts(a);
+  const coreB = withoutCuts(b);
+  const setA = new Set(coreA);
+  const setB = new Set(coreB);
+  return coreA.every((t) => setB.has(t)) || coreB.every((t) => setA.has(t));
+}
+
+/** "chicken or pork" / "chicken/pork" → [["chicken"], ["pork"]]; any one of them will do. */
+function alternatives(name: string): string[][] {
+  return coreName(name)
+    .split(/\s+or\s+|\s*\/\s*/i)
+    .map((alt) => meaningfulWords(alt).map(singular))
+    .filter((tokens) => tokens.length > 0);
 }
 
 export function findPantryMatch(name: string, pantry: PantryItem[]): PantryItem | null {
-  const tokens = ingredientTokens(name);
-  return pantry.find((p) => tokensMatch(tokens, ingredientTokens(p.name))) ?? null;
+  for (const tokens of alternatives(name)) {
+    const match = pantry.find((p) => tokensMatch(tokens, ingredientTokens(p.name)));
+    if (match) return match;
+  }
+  return null;
 }
 
 /** "(15 oz) can chickpeas, drained" → "chickpeas", for the shopping list and fridge. */
 export function shoppingName(name: string): string {
-  const core = name.split(",")[0].replace(/\([^)]*\)/g, " ").replace(/\s+/g, " ").trim();
-  const words = core.split(" ");
+  const words = coreName(name).split(" ");
   while (words.length > 1 && IGNORED_WORDS.has(words[0].toLowerCase())) words.shift();
   return words.join(" ") || name.trim();
 }
@@ -154,6 +204,92 @@ export function buildShoppingList(
   return [...lines.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
 
+// ── Suggestions: recipes you can make from the fridge ────────────────────────
+
+export type ReadinessStatus = "ready" | "almost";
+
+export interface Readiness {
+  status: ReadinessStatus | null;
+  missing: string[];
+  have: number;
+  total: number;
+  /** False when no ingredients are starred, so every ingredient is counted instead */
+  basedOnEssentials: boolean;
+}
+
+const FALLBACK_READY_RATIO = 0.75;
+const FALLBACK_ALMOST_RATIO = 0.5;
+
+export function recipeReadiness(recipe: RecipeWithIngredients, pantry: PantryItem[]): Readiness {
+  const essentials = recipe.recipe_ingredients.filter((i) => i.is_essential);
+  const basedOnEssentials = essentials.length > 0;
+  const pool = basedOnEssentials ? essentials : recipe.recipe_ingredients;
+  const missing = pool.filter((i) => !findPantryMatch(i.name, pantry)).map((i) => shoppingName(i.name));
+  const total = pool.length;
+  const have = total - missing.length;
+
+  let status: ReadinessStatus | null = null;
+  if (have > 0) {
+    if (basedOnEssentials) {
+      status = missing.length === 0 ? "ready" : missing.length === 1 ? "almost" : null;
+    } else {
+      const ratio = have / total;
+      status = ratio >= FALLBACK_READY_RATIO ? "ready" : ratio >= FALLBACK_ALMOST_RATIO ? "almost" : null;
+    }
+  }
+  return { status, missing, have, total, basedOnEssentials };
+}
+
+export function readinessLabel(r: Readiness): string {
+  if (!r.basedOnEssentials) return `Have ${r.have} of ${r.total}`;
+  if (r.missing.length === 0) return "Ready to make";
+  return `Need ${r.missing.join(", ")}`;
+}
+
+export interface RecipeSuggestion extends Readiness {
+  recipe: RecipeWithIngredients;
+  status: ReadinessStatus;
+  planned: boolean;
+}
+
+/** Ranks recipes by what's in the fridge; ones already planned this week go last for variety. */
+export function suggestRecipes(
+  recipes: RecipeWithIngredients[],
+  pantry: PantryItem[],
+  plannedRecipeIds: Set<string>
+): RecipeSuggestion[] {
+  const suggestions: RecipeSuggestion[] = [];
+  for (const recipe of recipes) {
+    const readiness = recipeReadiness(recipe, pantry);
+    if (readiness.status) {
+      suggestions.push({ ...readiness, status: readiness.status, recipe, planned: plannedRecipeIds.has(recipe.id) });
+    }
+  }
+  const rank = (s: RecipeSuggestion) => [
+    s.planned ? 1 : 0,
+    s.status === "ready" ? 0 : 1,
+    s.basedOnEssentials ? 0 : 1,
+    s.missing.length,
+  ];
+  return suggestions.sort((a, b) => {
+    const ra = rank(a);
+    const rb = rank(b);
+    for (let i = 0; i < ra.length; i++) if (ra[i] !== rb[i]) return ra[i] - rb[i];
+    return a.recipe.title.localeCompare(b.recipe.title);
+  });
+}
+
+const MINOR_INGREDIENTS = new Set(["garlic", "shallot", "scallion", "ginger", "flour"]);
+
+/** Pre-stars likely essentials (proteins, main vegetables, starches) on new recipes. */
+export function guessEssential(name: string): boolean {
+  if (/\b(optional|garnish|to taste|for serving)\b/i.test(name)) return false;
+  const tokens = ingredientTokens(name);
+  if (tokens.some((t) => MINOR_INGREDIENTS.has(t)) || tokens.join(" ") === "green onion") return false;
+  const category = guessCategory(name);
+  return category === "protein" || category === "vegetable" || category === "grain";
+}
+
 // ── Fridge categories ────────────────────────────────────────────────────────
 
 export const PANTRY_CATEGORIES: { value: PantryCategory; label: string }[] = [
@@ -175,7 +311,7 @@ const CATEGORY_KEYWORDS: [PantryCategory, string[]][] = [
   ["vegetable", ["cucumber", "tomato", "lettuce", "spinach", "onion", "garlic", "pepper", "carrot", "broccoli", "zucchini", "kale", "celery", "mushroom", "potato", "cabbage", "cauliflower", "asparagu", "corn", "bean", "pea", "scallion", "shallot", "arugula", "eggplant"]],
   ["fruit", ["avocado", "lemon", "lime", "apple", "banana", "berry", "strawberry", "blueberry", "orange", "grape", "mango", "pineapple"]],
   ["grain", ["rice", "pasta", "bread", "panko", "flour", "quinoa", "tortilla", "oat", "noodle", "couscou", "pita", "breadcrumb"]],
-  ["condiment", ["sauce", "oil", "vinegar", "mayo", "mayonnaise", "mustard", "ketchup", "soy", "honey", "hummu", "tahini", "salsa", "dressing", "sriracha"]],
+  ["condiment", ["sauce", "broth", "stock", "oil", "vinegar", "mayo", "mayonnaise", "mustard", "ketchup", "soy", "honey", "hummu", "tahini", "salsa", "dressing", "sriracha"]],
   ["spice", ["salt", "cumin", "paprika", "oregano", "cinnamon", "chili", "basil", "thyme", "rosemary", "parsley", "cilantro", "dill", "turmeric"]],
 ];
 
