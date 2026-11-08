@@ -72,6 +72,11 @@ const IGNORED_WORDS = new Set([
   "peeled", "cubed", "large", "medium", "small", "boneless", "skinless", "organic",
   "finely", "roughly", "thinly", "optional", "divided", "can", "canned", "jar",
   "package", "of", "a", "an", "the", "and", "or", "to", "taste", "for",
+  "about", "approximately", "such", "as", "like", "any", "your", "favorite", "choice",
+  // Units, for names where the amount wasn't split off or sits in parentheses
+  "g", "l", "oz", "ounce", "ounces", "lb", "lbs", "pound", "pounds", "gram", "grams", "kg",
+  "ml", "cup", "cups", "tbsp", "tsp", "tablespoon", "tablespoons", "teaspoon", "teaspoons",
+  "inch", "inches",
 ]);
 
 const NEVER_SHOP_FOR = new Set(["water", "ice"]);
@@ -142,17 +147,33 @@ function tokensMatch(a: string[], b: string[]): boolean {
   return coreA.every((t) => setB.has(t)) || coreB.every((t) => setA.has(t));
 }
 
-/** "chicken or pork" / "chicken/pork" → [["chicken"], ["pork"]]; any one of them will do. */
+/**
+ * Every way to satisfy an ingredient; any one of them will do.
+ * "chicken or pork", "chicken/pork" → [["chicken"], ["pork"]]
+ * "Ground Meat (Turkey, Beef, Pork)" → [["ground", "meat"], ["turkey"], ["beef"], ["pork"]]
+ */
 function alternatives(name: string): string[][] {
-  return coreName(name)
-    .split(/\s+or\s+|\s*\/\s*/i)
+  const fromParentheses = [...name.matchAll(/\(([^)]*)\)/g)].flatMap((m) => m[1].split(/,|\s+or\s+|\//i));
+  return [...coreName(name).split(/\s+or\s+|\s*\/\s*/i), ...fromParentheses]
     .map((alt) => meaningfulWords(alt).map(singular))
     .filter((tokens) => tokens.length > 0);
 }
 
+const MEATS = new Set([
+  "chicken", "turkey", "beef", "pork", "lamb", "veal", "bison", "sausage", "bacon", "ham", "steak",
+]);
+
+/** "meat" / "ground meat" in a recipe: any meat in the fridge counts */
+function isGenericMeat(tokens: string[]): boolean {
+  const core = tokens.filter((t) => !CUT_WORDS.has(t));
+  return core.length === 1 && core[0] === "meat";
+}
+
 export function findPantryMatch(name: string, pantry: PantryItem[]): PantryItem | null {
   for (const tokens of alternatives(name)) {
-    const match = pantry.find((p) => tokensMatch(tokens, ingredientTokens(p.name)));
+    const match = isGenericMeat(tokens)
+      ? pantry.find((p) => ingredientTokens(p.name).some((t) => MEATS.has(t)))
+      : pantry.find((p) => tokensMatch(tokens, ingredientTokens(p.name)));
     if (match) return match;
   }
   return null;
