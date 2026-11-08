@@ -391,7 +391,7 @@ function ShoppingMode({
 
   return (
     <div className="max-w-xl">
-      <div className="sticky top-14 lg:top-0 z-10 -mx-4 px-4 py-3 mb-4 bg-background/95 backdrop-blur border-b border-border flex items-center gap-3">
+      <div className="sticky top-[calc(3.5rem_+_env(safe-area-inset-top))] lg:top-0 z-10 -mx-4 px-4 py-3 mb-4 bg-background/95 backdrop-blur border-b border-border flex items-center gap-3">
         <div className="flex-1 min-w-0">
           <p className="font-semibold">Shopping</p>
           <p className="text-xs text-muted-foreground">

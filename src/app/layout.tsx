@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { Geist } from "next/font/google";
 import { cn } from "@/lib/utils";
@@ -8,6 +8,14 @@ const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 export const metadata: Metadata = {
   title: "Life Planner",
   description: "AI-powered trip planning",
+};
+
+// Lets the page draw under the iPhone notch and home indicator; fixed bars pad themselves
+// with env(safe-area-inset-*) so nothing ends up hidden behind them
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({

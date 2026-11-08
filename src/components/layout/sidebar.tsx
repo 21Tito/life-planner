@@ -25,7 +25,7 @@ export function Sidebar({ user }: SidebarProps) {
   return (
     <>
       {/* Mobile top header */}
-      <header className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white border-b border-border px-4 h-14 flex items-center justify-between">
+      <header className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white/85 backdrop-blur-xl border-b border-border px-4 pt-[env(safe-area-inset-top)] h-[calc(3.5rem_+_env(safe-area-inset-top))] flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded-md bg-primary flex items-center justify-center text-primary-foreground text-xs font-bold">
             LP

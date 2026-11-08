@@ -28,7 +28,7 @@ export function Modal({ title, onClose, children, footer, wide }: ModalProps) {
     >
       <div
         className={cn(
-          "bg-white sm:rounded-2xl rounded-t-2xl shadow-2xl w-full flex flex-col max-h-[90vh]",
+          "bg-white sm:rounded-2xl rounded-t-2xl shadow-2xl w-full flex flex-col max-h-[90vh] pb-[env(safe-area-inset-bottom)] sm:pb-0",
           wide ? "sm:max-w-2xl" : "sm:max-w-md"
         )}
       >
