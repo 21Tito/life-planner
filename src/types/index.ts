@@ -88,6 +88,64 @@ export interface GoogleTokens {
   updated_at: string;
 }
 
+export type PantryCategory =
+  | "protein"
+  | "dairy"
+  | "vegetable"
+  | "fruit"
+  | "grain"
+  | "spice"
+  | "condiment"
+  | "frozen"
+  | "beverage"
+  | "other";
+
+export interface PantryItem {
+  id: string;
+  user_id: string;
+  name: string;
+  category: PantryCategory;
+  quantity: string | null;
+  expiry_date: string | null;
+  created_at: string;
+}
+
+export interface Recipe {
+  id: string;
+  user_id: string;
+  title: string;
+  source_url: string | null;
+  instructions: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RecipeIngredient {
+  id: string;
+  recipe_id: string;
+  user_id: string;
+  name: string;
+  quantity: string | null;
+  sort_order: number;
+}
+
+export type RecipeWithIngredients = Recipe & {
+  recipe_ingredients: RecipeIngredient[];
+};
+
+export type MealSlot = "lunch" | "dinner";
+
+export interface MealPlanEntry {
+  id: string;
+  user_id: string;
+  date: string;
+  slot: MealSlot;
+  recipe_id: string | null;
+  title: string;
+  created_at: string;
+}
+
 // ===========================================
 // API request/response types
 // ===========================================
