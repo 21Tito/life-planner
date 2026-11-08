@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { ClaudeConnector, type Connection } from "./claude-connector";
 
 interface Member {
   id: string;
@@ -17,9 +18,11 @@ interface Props {
   activeToken: string | null;
   isMember: boolean;
   ownerName: string | null;
+  connectorUrl: string;
+  connections: Connection[];
 }
 
-export function SettingsClient({ members, activeToken, isMember, ownerName }: Props) {
+export function SettingsClient({ members, activeToken, isMember, ownerName, connectorUrl, connections }: Props) {
   const router = useRouter();
   const [currentMembers, setCurrentMembers] = useState<Member[]>(members);
   const [token, setToken] = useState<string | null>(activeToken);
@@ -116,6 +119,7 @@ export function SettingsClient({ members, activeToken, isMember, ownerName }: Pr
             </CardContent>
           </Card>
         )}
+        <ClaudeConnector connectorUrl={connectorUrl} connections={connections} />
       </div>
     );
   }
@@ -242,6 +246,8 @@ export function SettingsClient({ members, activeToken, isMember, ownerName }: Pr
           )}
         </CardContent>
       </Card>
+
+      <ClaudeConnector connectorUrl={connectorUrl} connections={connections} />
     </div>
   );
 }

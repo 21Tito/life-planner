@@ -2,12 +2,13 @@ import { createClient } from "@/lib/supabase/server";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { getSessionIds } from "@/lib/get-owner-id";
 import { SettingsClient } from "./settings-client";
+import { mcpResourceUrl } from "@/lib/oauth";
 
 export default async function SettingsPage() {
   const supabase = await createClient();
   const { userId } = await getSessionIds(supabase);
 
-  const [{ data: membersRaw }, { data: invite }, { data: ownMembership }] =
+  const [{ data: membersRaw }, { data: invite }, { data: ownMembership }, { data: grants }] =
     await Promise.all([
       supabase
         .from("household_members")
@@ -23,6 +24,11 @@ export default async function SettingsPage() {
         .select("owner_id")
         .eq("member_id", userId)
         .maybeSingle(),
+      supabase
+        .from("oauth_grants")
+        .select("id, client_name, created_at, last_used_at")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false }),
     ]);
 
   const admin = createAdminClient(
@@ -85,6 +91,13 @@ export default async function SettingsPage() {
       activeToken={invite?.token ?? null}
       isMember={!!ownMembership}
       ownerName={ownerName}
+      connectorUrl={mcpResourceUrl()}
+      connections={(grants ?? []).map((g) => ({
+        id: g.id,
+        clientName: g.client_name,
+        createdAt: g.created_at,
+        lastUsedAt: g.last_used_at,
+      }))}
     />
   );
 }
