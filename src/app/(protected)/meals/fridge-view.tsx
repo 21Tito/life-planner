@@ -37,7 +37,8 @@ export function FridgeView({ pantry, setPantry, reviewAge, onReviewed }: Props) 
     const { error } = await supabase
       .from("pantry_status")
       .upsert({ user_id: ownerId, reviewed_at }, { onConflict: "user_id" });
-    if (!error) onReviewed(reviewed_at);
+    if (error) setError(`Couldn't mark the fridge as reviewed: ${error.message}`);
+    else onReviewed(reviewed_at);
   }
 
   async function addItem(e: React.FormEvent) {

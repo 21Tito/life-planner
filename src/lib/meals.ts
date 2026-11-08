@@ -32,7 +32,8 @@ export function weekDates(weekStart: Date): Date[] {
 }
 
 export function daysSince(iso: string, now = new Date()): number {
-  return Math.floor((now.getTime() - new Date(iso).getTime()) / (1000 * 60 * 60 * 24));
+  // Clamped: a timestamp from moments after `now` was captured would otherwise floor to -1
+  return Math.max(0, Math.floor((now.getTime() - new Date(iso).getTime()) / (1000 * 60 * 60 * 24)));
 }
 
 // ── Ingredient text ──────────────────────────────────────────────────────────
