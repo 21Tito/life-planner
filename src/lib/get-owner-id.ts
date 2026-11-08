@@ -20,6 +20,19 @@ export async function getSessionIds(supabase: SupabaseClient) {
   return { user, userId: user.id, ownerId: await getHouseholdOwnerId(supabase, user.id) };
 }
 
+/**
+ * Faster variant for page loads that query through RLS: verifies the JWT locally with the
+ * project's signing keys instead of a round trip to the Auth server. It's as strict as RLS
+ * itself, but unlike getUser() it doesn't notice a session revoked within the token's
+ * lifetime, so service-role routes should keep using getSessionIds().
+ */
+export async function getVerifiedIds(supabase: SupabaseClient) {
+  const { data } = await supabase.auth.getClaims();
+  const userId = data?.claims?.sub;
+  if (!userId) throw new Error("Unauthorized");
+  return { userId, ownerId: await getHouseholdOwnerId(supabase, userId) };
+}
+
 export async function getHouseholdOwnerId(supabase: SupabaseClient, userId: string): Promise<string> {
   const { data } = await supabase
     .from("household_members")

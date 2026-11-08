@@ -12,29 +12,25 @@ export default async function ProtectedLayout({
 }) {
   const supabase = await createClient();
 
-  // getSession() reads from the cookie instantly (no network round-trip),
-  // giving us the user ID so we can fire the profile fetch in parallel
-  // with getUser() which verifies the JWT with the auth server.
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) redirect("/login");
+  // Verified locally against the project's signing keys; no Auth server round trip
+  const { data } = await supabase.auth.getClaims();
+  const userId = data?.claims?.sub;
+  if (!userId) redirect("/login");
+  const email = typeof data?.claims?.email === "string" ? data.claims.email : "";
 
-  // Database queries are authorized by the JWT itself, so they can run alongside getUser()
-  const [{ data: { user } }, { data: profile }, ownerId] = await Promise.all([
-    supabase.auth.getUser(),
-    supabase.from("profiles").select("full_name, avatar_url").eq("id", session.user.id).single(),
-    getHouseholdOwnerId(supabase, session.user.id),
+  const [{ data: profile }, ownerId] = await Promise.all([
+    supabase.from("profiles").select("full_name, avatar_url").eq("id", userId).single(),
+    getHouseholdOwnerId(supabase, userId),
   ]);
-
-  if (!user || user.id !== session.user.id) redirect("/login");
 
   return (
     <HouseholdProvider ownerId={ownerId}>
       <div className="flex min-h-screen">
         <Sidebar
           user={{
-            id: user.id,
-            email: user.email!,
-            name: profile?.full_name ?? user.email!,
+            id: userId,
+            email,
+            name: profile?.full_name ?? email,
             avatar: profile?.avatar_url ?? undefined,
           }}
         />

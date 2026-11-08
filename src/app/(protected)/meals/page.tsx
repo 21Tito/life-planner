@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { getSessionIds } from "@/lib/get-owner-id";
+import { getVerifiedIds } from "@/lib/get-owner-id";
 import type { MealPlanEntry, PantryItem, RecipeWithIngredients, ShoppingItem } from "@/types";
 import { MealsClient, type MealsTab } from "./meals-client";
 
@@ -15,7 +15,7 @@ export default async function MealsPage({
   // The Kitchen tab used to be called Fridge; keep old links working
   const tab = requestedTab === "fridge" ? "kitchen" : requestedTab;
   const supabase = await createClient();
-  const { ownerId } = await getSessionIds(supabase);
+  const { ownerId } = await getVerifiedIds(supabase);
 
   // The server clock is UTC; this window covers the viewer's current week in any timezone
   const now = Date.now();

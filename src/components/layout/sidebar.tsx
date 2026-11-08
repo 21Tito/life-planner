@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePendingNav } from "./use-pending-nav";
 import { Icons } from "@/components/ui/icons";
 import { UserMenu } from "@/components/layout/user-menu";
 
@@ -20,7 +20,7 @@ const navItems = [
 ];
 
 export function Sidebar({ user }: SidebarProps) {
-  const pathname = usePathname();
+  const nav = usePendingNav();
 
   return (
     <>
@@ -53,11 +53,12 @@ export function Sidebar({ user }: SidebarProps) {
 
         <nav className="flex-1 space-y-1">
           {navItems.map((item) => {
-            const isActive = pathname.startsWith(item.href);
+            const isActive = nav.isActive(item.href);
             return (
               <Link
                 key={item.href}
                 href={item.href}
+                onClick={() => nav.onNavigate(item.href)}
                 className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
                   isActive
                     ? "bg-secondary text-primary"

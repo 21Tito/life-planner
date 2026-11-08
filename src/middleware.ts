@@ -25,15 +25,16 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  // Refresh the auth token
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Refreshes the session if needed and verifies the JWT locally against the project's
+  // signing keys, avoiding an Auth server round trip on every navigation
+  const { data } = await supabase.auth.getClaims();
+  const user = data?.claims ?? null;
 
   // Redirect unauthenticated users away from protected routes
   const isProtectedRoute =
     request.nextUrl.pathname.startsWith("/trips") ||
-    request.nextUrl.pathname.startsWith("/meals");
+    request.nextUrl.pathname.startsWith("/meals") ||
+    request.nextUrl.pathname.startsWith("/settings");
 
   if (!user && isProtectedRoute) {
     const url = request.nextUrl.clone();
