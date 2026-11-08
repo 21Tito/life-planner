@@ -19,7 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Icons } from "@/components/ui/icons";
-import { ErrorText, FieldLabel, Modal } from "./modal";
+import { ErrorText, FieldLabel, Modal, nativeSelectClass } from "./modal";
 
 interface Props {
   items: ShoppingItem[];
@@ -36,7 +36,7 @@ const CATEGORY_LABELS = new Map(PANTRY_CATEGORIES.map((c) => [c.value, c.label])
 function groupForStore(items: ShoppingItem[]) {
   const byCategory = new Map<PantryCategory, ShoppingItem[]>();
   for (const item of items) {
-    const category = guessCategory(item.name);
+    const category = item.category ?? guessCategory(item.name);
     byCategory.set(category, [...(byCategory.get(category) ?? []), item]);
   }
   return STORE_CATEGORY_ORDER.filter((c) => byCategory.has(c)).map((c) => ({
@@ -46,16 +46,13 @@ function groupForStore(items: ShoppingItem[]) {
   }));
 }
 
-function itemText(item: { name: string; quantity: string | null }) {
-  return item.quantity ? `${item.name} (${item.quantity})` : item.name;
-}
-
 export function ShoppingView({ items, setItems, setPantry, weekStart, entries, recipes, pantry }: Props) {
   const supabase = createClient();
   const ownerId = useOwnerId();
 
   const [name, setName] = useState("");
-  const [quantity, setQuantity] = useState("");
+  const [category, setCategory] = useState<PantryCategory>("other");
+  const [categoryTouched, setCategoryTouched] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -66,13 +63,13 @@ export function ShoppingView({ items, setItems, setPantry, weekStart, entries, r
   const toBuy = items.filter((i) => !i.checked);
   const inCart = items.filter((i) => i.checked);
 
-  async function addItems(rows: { name: string; quantity: string | null }[]) {
+  async function addItems(rows: { name: string; category: PantryCategory }[]) {
     if (rows.length === 0) return;
     setBusy(true);
     setError(null);
     const { data, error } = await supabase
       .from("shopping_items")
-      .insert(rows.map((r) => ({ user_id: ownerId, name: r.name, quantity: r.quantity })))
+      .insert(rows.map((r) => ({ user_id: ownerId, name: r.name, category: r.category })))
       .select();
     setBusy(false);
     if (error || !data) {
@@ -87,9 +84,10 @@ export function ShoppingView({ items, setItems, setPantry, weekStart, entries, r
     e.preventDefault();
     const trimmed = name.trim();
     if (!trimmed || busy) return;
-    if (await addItems([{ name: trimmed, quantity: quantity.trim() || null }])) {
+    if (await addItems([{ name: trimmed, category }])) {
       setName("");
-      setQuantity("");
+      setCategory("other");
+      setCategoryTouched(false);
     }
   }
 
@@ -115,7 +113,7 @@ export function ShoppingView({ items, setItems, setPantry, weekStart, entries, r
   async function saveEdit(updated: ShoppingItem): Promise<string | null> {
     const { error } = await supabase
       .from("shopping_items")
-      .update({ name: updated.name, quantity: updated.quantity })
+      .update({ name: updated.name, category: updated.category })
       .eq("id", updated.id);
     if (error) return error.message;
     setItems((prev) => prev.map((i) => (i.id === updated.id ? updated : i)));
@@ -131,7 +129,7 @@ export function ShoppingView({ items, setItems, setPantry, weekStart, entries, r
           toKitchen.map((i) => ({
             user_id: ownerId,
             name: i.name,
-            category: guessCategory(i.name),
+            category: i.category ?? guessCategory(i.name),
           }))
         )
         .select();
@@ -148,7 +146,7 @@ export function ShoppingView({ items, setItems, setPantry, weekStart, entries, r
 
   async function copyList() {
     const text = groupForStore(toBuy)
-      .flatMap((g) => g.items.map(itemText))
+      .flatMap((g) => g.items.map((i) => i.name))
       .join("\n");
     try {
       await navigator.clipboard.writeText(text);
@@ -183,7 +181,7 @@ export function ShoppingView({ items, setItems, setPantry, weekStart, entries, r
   }
   const suggestionRow = (l: (typeof suggestions)[number]) => ({
     name: l.name,
-    quantity: l.quantities.length ? l.quantities.join(" + ").slice(0, 100) : null,
+    category: guessCategory(l.name),
   });
 
   if (shopping) {
@@ -222,17 +220,26 @@ export function ShoppingView({ items, setItems, setPantry, weekStart, entries, r
             <Input
               placeholder="Add an item, e.g. tofu"
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => {
+                setName(e.target.value);
+                if (!categoryTouched) setCategory(guessCategory(e.target.value));
+              }}
               maxLength={200}
               className="h-10 text-sm flex-1"
             />
-            <Input
-              placeholder="Amount (optional)"
-              value={quantity}
-              onChange={(e) => setQuantity(e.target.value)}
-              maxLength={100}
-              className="h-10 text-sm sm:w-36"
-            />
+            <select
+              value={category}
+              onChange={(e) => {
+                setCategory(e.target.value as PantryCategory);
+                setCategoryTouched(true);
+              }}
+              className={`${nativeSelectClass} sm:w-40`}
+              aria-label="Category"
+            >
+              {PANTRY_CATEGORIES.map((c) => (
+                <option key={c.value} value={c.value}>{c.label}</option>
+              ))}
+            </select>
             <Button type="submit" disabled={!name.trim() || busy} className="h-10 px-4 gap-1.5">
               {Icons.plus}
               Add
@@ -268,7 +275,6 @@ export function ShoppingView({ items, setItems, setPantry, weekStart, entries, r
                     </button>
                     <button onClick={() => setEditing(item)} className="flex-1 min-w-0 text-left py-1.5 text-sm">
                       <span className="font-medium">{item.name}</span>
-                      {item.quantity && <span className="text-muted-foreground"> · {item.quantity}</span>}
                     </button>
                     <button
                       onClick={() => remove(item)}
@@ -303,7 +309,7 @@ export function ShoppingView({ items, setItems, setPantry, weekStart, entries, r
                     >
                       {Icons.check}
                     </button>
-                    <span className="flex-1 min-w-0 text-sm text-muted-foreground line-through">{itemText(item)}</span>
+                    <span className="flex-1 min-w-0 text-sm text-muted-foreground line-through">{item.name}</span>
                   </li>
                 ))}
               </ul>
@@ -331,12 +337,7 @@ export function ShoppingView({ items, setItems, setPantry, weekStart, entries, r
             {suggestions.map((line) => (
               <li key={line.key} className="flex items-center gap-3 px-4 py-2.5">
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium">
-                    {line.name}
-                    {line.quantities.length > 0 && (
-                      <span className="font-normal text-muted-foreground"> · {line.quantities.join(" + ")}</span>
-                    )}
-                  </p>
+                  <p className="text-sm font-medium">{line.name}</p>
                   <p className="text-xs text-muted-foreground truncate">For {line.recipes.join(", ")}</p>
                 </div>
                 <Button
@@ -426,7 +427,6 @@ function ShoppingMode({
                       <span className="w-6 h-6 rounded-full border-2 border-muted-foreground/40 flex-shrink-0" />
                       <span className="flex-1 min-w-0">
                         <span className="text-base font-medium">{item.name}</span>
-                        {item.quantity && <span className="block text-sm text-muted-foreground">{item.quantity}</span>}
                       </span>
                     </button>
                   </li>
@@ -450,7 +450,7 @@ function ShoppingMode({
                   <span className="w-6 h-6 rounded-full bg-green-600 text-white flex items-center justify-center flex-shrink-0">
                     {Icons.check}
                   </span>
-                  <span className="flex-1 min-w-0 text-muted-foreground line-through">{itemText(item)}</span>
+                  <span className="flex-1 min-w-0 text-muted-foreground line-through">{item.name}</span>
                 </button>
               </li>
             ))}
@@ -519,7 +519,7 @@ function FinishModal({
                 onChange={() => toggle(item.id)}
                 className="w-4 h-4 accent-[var(--color-brand-600)]"
               />
-              {itemText(item)}
+              {item.name}
             </label>
           </li>
         ))}
@@ -539,14 +539,14 @@ function EditItemModal({
   onSave: (item: ShoppingItem) => Promise<string | null>;
 }) {
   const [name, setName] = useState(item.name);
-  const [quantity, setQuantity] = useState(item.quantity ?? "");
+  const [category, setCategory] = useState<PantryCategory>(item.category ?? guessCategory(item.name));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function save() {
     if (!name.trim()) return;
     setSaving(true);
-    const err = await onSave({ ...item, name: name.trim(), quantity: quantity.trim() || null });
+    const err = await onSave({ ...item, name: name.trim(), category });
     setSaving(false);
     if (err) setError(err);
     else onClose();
@@ -571,14 +571,16 @@ function EditItemModal({
           <Input value={name} onChange={(e) => setName(e.target.value)} maxLength={200} className="h-10 text-sm" />
         </div>
         <div>
-          <FieldLabel optional>Amount</FieldLabel>
-          <Input
-            value={quantity}
-            onChange={(e) => setQuantity(e.target.value)}
-            maxLength={100}
-            placeholder="e.g. 2 blocks"
-            className="h-10 text-sm"
-          />
+          <FieldLabel>Category</FieldLabel>
+          <select
+            value={category}
+            onChange={(e) => setCategory(e.target.value as PantryCategory)}
+            className={nativeSelectClass}
+          >
+            {PANTRY_CATEGORIES.map((c) => (
+              <option key={c.value} value={c.value}>{c.label}</option>
+            ))}
+          </select>
         </div>
         {error && <ErrorText>{error}</ErrorText>}
       </div>

@@ -3,8 +3,8 @@
 import { createClient } from "@/lib/supabase/client";
 import { useState } from "react";
 import { useOwnerId } from "@/lib/household-context";
-import type { MealPlanEntry, PantryItem, RecipeWithIngredients, ShoppingItem } from "@/types";
-import { findPantryMatch, isOnList } from "@/lib/meals";
+import type { MealPlanEntry, PantryCategory, PantryItem, RecipeWithIngredients, ShoppingItem } from "@/types";
+import { findPantryMatch, guessCategory, isOnList } from "@/lib/meals";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -68,14 +68,21 @@ export function DoneCookingModal({
     setError(null);
 
     const outItems = rows.filter((r) => choiceFor(r.item.id) !== "have").map((r) => r.item);
-    const names = [
-      ...rows.filter((r) => choiceFor(r.item.id) === "buy").map((r) => r.item.name),
-      ...extra.split(",").map((s) => s.trim()).filter(Boolean),
+    // Items from the kitchen keep their category; anything typed in gets a guessed one
+    const candidates = [
+      ...rows
+        .filter((r) => choiceFor(r.item.id) === "buy")
+        .map((r) => ({ name: r.item.name, category: r.item.category })),
+      ...extra
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .map((name) => ({ name, category: guessCategory(name) })),
     ];
-    const toList: string[] = [];
-    for (const name of names) {
-      if (!isOnList(name, shoppingItems) && !isOnList(name, toList.map((n) => ({ name: n })))) {
-        toList.push(name.slice(0, 200));
+    const toList: { name: string; category: PantryCategory }[] = [];
+    for (const c of candidates) {
+      if (!isOnList(c.name, shoppingItems) && !isOnList(c.name, toList)) {
+        toList.push({ name: c.name.slice(0, 200), category: c.category });
       }
     }
 
@@ -83,7 +90,7 @@ export function DoneCookingModal({
     if (toList.length > 0) {
       const { data, error } = await supabase
         .from("shopping_items")
-        .insert(toList.map((name) => ({ user_id: ownerId, name })))
+        .insert(toList.map((c) => ({ user_id: ownerId, name: c.name, category: c.category })))
         .select();
       if (error || !data) {
         setSaving(false);

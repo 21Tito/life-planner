@@ -152,7 +152,8 @@ export interface ShoppingItem {
   id: string;
   user_id: string;
   name: string;
-  quantity: string | null;
+  /** Null means "guess from the name" */
+  category: PantryCategory | null;
   checked: boolean;
   created_at: string;
 }
