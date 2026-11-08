@@ -72,7 +72,7 @@ export function formatIngredient(i: Pick<RecipeIngredient, "name" | "quantity">)
   return i.quantity ? `${i.quantity} ${i.name}` : i.name;
 }
 
-// ── Matching recipe ingredients against the fridge ───────────────────────────
+// ── Matching recipe ingredients against the kitchen ───────────────────────────
 
 const IGNORED_WORDS = new Set([
   "fresh", "chopped", "diced", "minced", "sliced", "shredded", "grated", "crushed",
@@ -123,14 +123,14 @@ export function ingredientTokens(name: string): string[] {
   return meaningfulWords(coreName(name)).map(singular);
 }
 
-// Cuts and forms of the same ingredient: "chicken breast" in the fridge works for "chicken thighs"
+// Cuts and forms of the same ingredient: "chicken breast" in the kitchen works for "chicken thighs"
 const CUT_WORDS = new Set([
   "breast", "thigh", "leg", "drumstick", "wing", "tender", "tenderloin", "cutlet", "fillet",
   "filet", "loin", "shoulder", "chop", "rib", "belly", "butt", "sirloin", "flank", "strip",
   "steak", "ground", "mince", "piece", "whole",
 ]);
 
-// Products made from an ingredient: "chicken" in the fridge doesn't cover "chicken broth"
+// Products made from an ingredient: "chicken" in the kitchen doesn't cover "chicken broth"
 const PRODUCT_WORDS = new Set([
   "broth", "stock", "bouillon", "sauce", "powder", "seasoning", "paste", "oil", "vinegar",
   "extract", "cube", "flake",
@@ -170,7 +170,7 @@ const MEATS = new Set([
   "chicken", "turkey", "beef", "pork", "lamb", "veal", "bison", "sausage", "bacon", "ham", "steak",
 ]);
 
-/** "meat" / "ground meat" in a recipe: any meat in the fridge counts */
+/** "meat" / "ground meat" in a recipe: any meat in the kitchen counts */
 function isGenericMeat(tokens: string[]): boolean {
   const core = tokens.filter((t) => !CUT_WORDS.has(t));
   return core.length === 1 && core[0] === "meat";
@@ -186,7 +186,7 @@ export function findPantryMatch(name: string, pantry: PantryItem[]): PantryItem 
   return null;
 }
 
-/** "(15 oz) can chickpeas, drained" → "chickpeas", for the shopping list and fridge. */
+/** "(15 oz) can chickpeas, drained" → "chickpeas", for the shopping list and kitchen. */
 export function shoppingName(name: string): string {
   const words = coreName(name).split(" ");
   while (words.length > 1 && IGNORED_WORDS.has(words[0].toLowerCase())) words.shift();
@@ -201,7 +201,7 @@ export interface ShoppingLine {
   match: PantryItem | null;
 }
 
-/** Combines the week's recipe ingredients and marks the ones already in the fridge. */
+/** Combines the week's recipe ingredients and marks the ones already in the kitchen. */
 export function buildShoppingList(
   entries: MealPlanEntry[],
   recipes: RecipeWithIngredients[],
@@ -232,7 +232,7 @@ export function buildShoppingList(
   return [...lines.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
 
-// ── Suggestions: recipes you can make from the fridge ────────────────────────
+// ── Suggestions: recipes you can make from the kitchen ────────────────────────
 
 export type ReadinessStatus = "ready" | "almost";
 
@@ -280,7 +280,7 @@ export interface RecipeSuggestion extends Readiness {
   planned: boolean;
 }
 
-/** Ranks recipes by what's in the fridge; ones already planned this week go last for variety. */
+/** Ranks recipes by what's in the kitchen; ones already planned this week go last for variety. */
 export function suggestRecipes(
   recipes: RecipeWithIngredients[],
   pantry: PantryItem[],
@@ -318,7 +318,7 @@ export function guessEssential(name: string): boolean {
   return category === "protein" || category === "vegetable" || category === "grain";
 }
 
-// ── Fridge categories ────────────────────────────────────────────────────────
+// ── Kitchen categories ───────────────────────────────────────────────────────
 
 export const PANTRY_CATEGORIES: { value: PantryCategory; label: string }[] = [
   { value: "protein", label: "Protein" },
@@ -333,12 +333,36 @@ export const PANTRY_CATEGORIES: { value: PantryCategory; label: string }[] = [
   { value: "other", label: "Other" },
 ];
 
+// ── Expiration (month/year) for long-lasting items ───────────────────────────
+
+export const EXPIRY_CATEGORIES: PantryCategory[] = ["spice", "condiment"];
+const EXPIRING_SOON_DAYS = 31;
+
+/** Stored as the first of the month ("2027-03-01"); the item is good through the end of that month. */
+export function expiryDate(year: number, month: number): string {
+  return `${year}-${String(month).padStart(2, "0")}-01`;
+}
+
+export function formatExpiry(expiry: string): string {
+  const [y, m] = expiry.split("-").map(Number);
+  return new Date(y, m - 1, 1).toLocaleDateString("en-US", { month: "short", year: "numeric" });
+}
+
+export function expiryStatus(expiry: string, now: Date): "expired" | "soon" | "ok" {
+  const [y, m] = expiry.split("-").map(Number);
+  const lastDay = new Date(y, m, 0); // day 0 of the next month = last day of this one
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  if (today > lastDay) return "expired";
+  const daysLeft = (lastDay.getTime() - today.getTime()) / (24 * 60 * 60 * 1000);
+  return daysLeft <= EXPIRING_SOON_DAYS ? "soon" : "ok";
+}
+
 // Roughly the order you walk a grocery store: produce first, then proteins and dairy
 export const STORE_CATEGORY_ORDER: PantryCategory[] = [
   "vegetable", "fruit", "protein", "dairy", "grain", "frozen", "condiment", "spice", "beverage", "other",
 ];
 
-/** Whether something with this name is already on the list (same loose matching as the fridge). */
+/** Whether something with this name is already on the list (same loose matching as the kitchen). */
 export function isOnList(name: string, items: { name: string }[]): boolean {
   return findPantryMatch(name, items as PantryItem[]) !== null;
 }

@@ -63,7 +63,7 @@ export default async function ConsentPage({
       <div className="rounded-xl ring-1 ring-foreground/10 bg-card p-4 text-sm space-y-3 mb-4">
         <p className="font-medium">{appName} will be able to:</p>
         <ul className="space-y-1.5 text-muted-foreground list-disc pl-5">
-          <li>See your fridge, recipes, and meal plan</li>
+          <li>See what&apos;s in your kitchen, your recipes, and your meal plan</li>
           <li>Save new recipes</li>
           <li>Add meals to your weekly plan</li>
         </ul>

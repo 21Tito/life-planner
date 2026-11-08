@@ -227,7 +227,7 @@ function upsertEntry(supabase: SupabaseBrowser, values: Omit<MealPlanEntry, "id"
     .single();
 }
 
-// ── Recipes you can make from the fridge ─────────────────────────────────────
+// ── Recipes you can make from what's in the kitchen ──────────────────────────
 
 const SUGGESTIONS_SHOWN = 4;
 
@@ -291,8 +291,8 @@ function Suggestions({
       {suggestions.length === 0 ? (
         <p className="text-sm text-muted-foreground">
           {anyStarred
-            ? "Nothing's ready with what's in your fridge right now."
-            : "Star the key ingredients in your recipes, and meals you can make from the fridge will show up here."}
+            ? "Nothing's ready with what's in your kitchen right now."
+            : "Star the key ingredients in your recipes, and meals you can make with what you have will show up here."}
         </p>
       ) : (
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
@@ -372,7 +372,7 @@ function SlotModal({
     day: "numeric",
   });
   const query = search.trim().toLowerCase();
-  // Recipes you can make from the fridge are listed first
+  // Recipes you can make with what's in the kitchen are listed first
   const ranked = recipes
     .map((recipe) => ({ recipe, readiness: recipeReadiness(recipe, pantry) }))
     .sort((a, b) => {
@@ -546,8 +546,8 @@ function ShoppingSummary({
         </p>
         <p className="text-muted-foreground text-xs mt-0.5">
           {stillNeeded > 0
-            ? `${stillNeeded} ingredient${stillNeeded === 1 ? "" : "s"} for this week's recipes aren't in your fridge or on the list yet.`
-            : "Everything this week's recipes need is in the fridge or on the list."}
+            ? `${stillNeeded} ingredient${stillNeeded === 1 ? "" : "s"} for this week's recipes aren't in your kitchen or on the list yet.`
+            : "Everything this week's recipes need is in your kitchen or on the list."}
         </p>
       </div>
       <Button variant="outline" size="sm" onClick={() => onGoToTab("shopping")}>

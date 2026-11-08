@@ -30,7 +30,7 @@ interface Props {
   onDone: () => void;
 }
 
-/** After cooking: mark fridge items as used up, optionally adding them to the shopping list. */
+/** After cooking: mark kitchen items as used up, optionally adding them to the shopping list. */
 export function DoneCookingModal({
   recipe,
   entry,
@@ -45,7 +45,7 @@ export function DoneCookingModal({
   const supabase = createClient();
   const ownerId = useOwnerId();
 
-  // One row per fridge item the recipe used, even if several ingredients map to it
+  // One row per kitchen item the recipe used, even if several ingredients map to it
   const used = new Map<string, { item: PantryItem; ingredients: string[] }>();
   for (const ing of recipe.recipe_ingredients) {
     const item = findPantryMatch(ing.name, pantry);
@@ -133,7 +133,7 @@ export function DoneCookingModal({
     >
       <div className="space-y-5 text-sm">
         {rows.length === 0 ? (
-          <p className="text-muted-foreground">None of this recipe&apos;s ingredients are in your fridge list.</p>
+          <p className="text-muted-foreground">None of this recipe&apos;s ingredients are in your kitchen list.</p>
         ) : (
           <div>
             <p className="text-muted-foreground mb-3">Did you use anything up?</p>

@@ -122,21 +122,20 @@ export function ShoppingView({ items, setItems, setPantry, weekStart, entries, r
     return null;
   }
 
-  /** Moves the chosen checked items into the fridge and clears every checked item off the list. */
-  async function finish(toFridge: ShoppingItem[]): Promise<string | null> {
-    if (toFridge.length > 0) {
+  /** Adds the chosen checked items to the kitchen and clears every checked item off the list. */
+  async function finish(toKitchen: ShoppingItem[]): Promise<string | null> {
+    if (toKitchen.length > 0) {
       const { data, error } = await supabase
         .from("pantry_items")
         .insert(
-          toFridge.map((i) => ({
+          toKitchen.map((i) => ({
             user_id: ownerId,
             name: i.name,
-            quantity: i.quantity,
             category: guessCategory(i.name),
           }))
         )
         .select();
-      if (error || !data) return error?.message ?? "Couldn't add to the fridge.";
+      if (error || !data) return error?.message ?? "Couldn't add to your kitchen.";
       setPantry((prev) => [...prev, ...(data as PantryItem[])]);
     }
     const ids = inCart.map((i) => i.id);
@@ -170,7 +169,7 @@ export function ShoppingView({ items, setItems, setPantry, weekStart, entries, r
     };
   }, [shopping]);
 
-  // Ingredients this week's recipes need that aren't in the fridge or already on the list
+  // Ingredients this week's recipes need that aren't in the kitchen or already on the list
   let suggestions: ReturnType<typeof buildShoppingList> = [];
   let weekLabel = "";
   if (weekStart) {
@@ -384,7 +383,7 @@ function ShoppingMode({
   onFinish: () => void;
   finishing: boolean;
   onCloseFinish: () => void;
-  finish: (toFridge: ShoppingItem[]) => Promise<string | null>;
+  finish: (toKitchen: ShoppingItem[]) => Promise<string | null>;
   error: string | null;
 }) {
   const total = toBuy.length + inCart.length;
@@ -471,7 +470,7 @@ function FinishModal({
 }: {
   inCart: ShoppingItem[];
   onClose: () => void;
-  finish: (toFridge: ShoppingItem[]) => Promise<string | null>;
+  finish: (toKitchen: ShoppingItem[]) => Promise<string | null>;
 }) {
   const [selected, setSelected] = useState<Set<string>>(() => new Set(inCart.map((i) => i.id)));
   const [saving, setSaving] = useState(false);
@@ -502,13 +501,13 @@ function FinishModal({
         <>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
           <Button onClick={done} disabled={saving}>
-            {saving ? "Saving…" : `Done${selected.size ? ` · ${selected.size} to fridge` : ""}`}
+            {saving ? "Saving…" : `Done${selected.size ? ` · add ${selected.size} to kitchen` : ""}`}
           </Button>
         </>
       }
     >
       <p className="text-sm text-muted-foreground mb-3">
-        Everything in the cart comes off the list. Uncheck anything that shouldn&apos;t go in the fridge or pantry.
+        Everything in the cart comes off the list. Uncheck anything you don&apos;t want to track in your kitchen.
       </p>
       <ul className="space-y-1">
         {inCart.map((item) => (

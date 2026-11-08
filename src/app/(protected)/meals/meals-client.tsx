@@ -16,17 +16,17 @@ import {
 import { cn } from "@/lib/utils";
 import { WeekView } from "./week-view";
 import { RecipesView } from "./recipes-view";
-import { FridgeView } from "./fridge-view";
+import { KitchenView } from "./kitchen-view";
 import { ShoppingView } from "./shopping-view";
 
-export type MealsTab = "week" | "recipes" | "fridge" | "shopping";
+export type MealsTab = "week" | "recipes" | "kitchen" | "shopping";
 export type OpenRecipe = { id: string; entryId?: string } | null;
 export type EditingSlot = { date: string; slot: MealSlot } | null;
 
 const TAB_LABELS: { value: MealsTab; label: string }[] = [
   { value: "week", label: "This Week" },
   { value: "recipes", label: "Recipes" },
-  { value: "fridge", label: "Fridge" },
+  { value: "kitchen", label: "Kitchen" },
   { value: "shopping", label: "Shopping" },
 ];
 
@@ -135,7 +135,7 @@ export function MealsClient({
           Meal Planner
         </h1>
         <p className="text-sm text-muted-foreground">
-          Plan the week&apos;s meals around what&apos;s already in your fridge.
+          Plan the week&apos;s meals around what&apos;s already in your kitchen.
         </p>
       </div>
 
@@ -162,19 +162,19 @@ export function MealsClient({
         ))}
       </div>
 
-      {needsReview && tab !== "fridge" && (
+      {needsReview && tab !== "kitchen" && (
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm">
           <p className="text-amber-900">
             {reviewAge === null
-              ? "Your fridge hasn't been reviewed yet."
-              : `Your fridge was last reviewed ${reviewAge} days ago.`}{" "}
+              ? "Your kitchen hasn't been reviewed yet."
+              : `Your kitchen was last reviewed ${reviewAge} days ago.`}{" "}
             Check what you have before planning.
           </p>
           <button
-            onClick={() => switchTab("fridge")}
+            onClick={() => switchTab("kitchen")}
             className="font-medium text-amber-900 underline underline-offset-2 hover:no-underline"
           >
-            Review fridge
+            Review kitchen
           </button>
         </div>
       )}
@@ -196,12 +196,13 @@ export function MealsClient({
           onGoToTab={switchTab}
         />
       )}
-      {tab === "fridge" && (
-        <FridgeView
+      {tab === "kitchen" && (
+        <KitchenView
           pantry={pantry}
           setPantry={setPantry}
           reviewAge={reviewAge}
           onReviewed={setReviewedAt}
+          now={now}
         />
       )}
       {tab === "shopping" && (

@@ -4,14 +4,16 @@ import type { MealPlanEntry, PantryItem, RecipeWithIngredients, ShoppingItem } f
 import { MealsClient, type MealsTab } from "./meals-client";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-const TABS: MealsTab[] = ["week", "recipes", "fridge", "shopping"];
+const TABS: MealsTab[] = ["week", "recipes", "kitchen", "shopping"];
 
 export default async function MealsPage({
   searchParams,
 }: {
   searchParams: Promise<{ tab?: string }>;
 }) {
-  const { tab } = await searchParams;
+  const { tab: requestedTab } = await searchParams;
+  // The Kitchen tab used to be called Fridge; keep old links working
+  const tab = requestedTab === "fridge" ? "kitchen" : requestedTab;
   const supabase = await createClient();
   const { ownerId } = await getSessionIds(supabase);
 

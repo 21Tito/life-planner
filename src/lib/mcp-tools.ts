@@ -4,6 +4,7 @@ import {
   PLANNED_WEEKDAYS,
   addDays,
   findPantryMatch,
+  formatExpiry,
   guessEssential,
   parseIngredientLines,
   readinessLabel,
@@ -125,10 +126,10 @@ function ingredientLine(i: { quantity: string | null; name: string }) {
 
 const TOOLS: Tool[] = [
   {
-    name: "get_fridge",
-    title: "Get fridge",
+    name: "get_kitchen",
+    title: "Get kitchen inventory",
     description:
-      "Lists what's currently in the household's fridge and pantry, with categories and amounts, and when it was last reviewed.",
+      "Lists what's currently in the household's kitchen (fridge and pantry), with categories, expiration month for spices and sauces, and when it was last reviewed.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
     readOnly: true,
     async handler(_args, ctx) {
@@ -138,7 +139,7 @@ const TOOLS: Tool[] = [
       ]);
       return {
         last_reviewed: status.data?.reviewed_at ?? null,
-        items: items.map((i) => ({ name: i.name, category: i.category, amount: i.quantity })),
+        items: items.map((i) => ({ name: i.name, category: i.category, expires: i.expiry_date ? formatExpiry(i.expiry_date) : null })),
       };
     },
   },
@@ -146,7 +147,7 @@ const TOOLS: Tool[] = [
     name: "list_recipes",
     title: "List saved recipes",
     description:
-      "Lists the household's saved recipes with their essential (starred) ingredients and whether they can be made from what's in the fridge right now.",
+      "Lists the household's saved recipes with their essential (starred) ingredients and whether they can be made from what's in the kitchen right now.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
     readOnly: true,
     async handler(_args, ctx) {
@@ -157,7 +158,7 @@ const TOOLS: Tool[] = [
           id: r.id,
           title: r.title,
           essential_ingredients: r.recipe_ingredients.filter((i) => i.is_essential).map((i) => i.name),
-          fridge_status: readiness.status ? readinessLabel(readiness) : `Missing ${readiness.missing.length} of ${readiness.total}`,
+          kitchen_status: readiness.status ? readinessLabel(readiness) : `Missing ${readiness.missing.length} of ${readiness.total}`,
           source_url: r.source_url,
         };
       });
@@ -166,7 +167,7 @@ const TOOLS: Tool[] = [
   {
     name: "get_recipe",
     title: "Get recipe",
-    description: "Gets a saved recipe's full ingredients (marking which are essential and which are in the fridge), instructions, and notes.",
+    description: "Gets a saved recipe's full ingredients (marking which are essential and which are in the kitchen), instructions, and notes.",
     inputSchema: {
       type: "object",
       properties: { recipe_id: { type: "string", description: "Recipe id from list_recipes" } },
@@ -197,7 +198,7 @@ const TOOLS: Tool[] = [
           .map((i) => ({
             ingredient: ingredientLine(i),
             essential: i.is_essential,
-            in_fridge: findPantryMatch(i.name, pantry) !== null,
+            in_kitchen: findPantryMatch(i.name, pantry) !== null,
           })),
         instructions: recipe.instructions,
         notes: recipe.notes,
@@ -248,7 +249,7 @@ const TOOLS: Tool[] = [
     title: "Save recipe",
     description:
       "Saves a new recipe to the household's recipe library. Only call this when the user asks to save a recipe. " +
-      "List essential_ingredients (the few the dish can't be made without, e.g. the protein and main vegetables) so the app can suggest it when they're in the fridge; use 'or' for swaps like 'chicken or pork'.",
+      "List essential_ingredients (the few the dish can't be made without, e.g. the protein and main vegetables) so the app can suggest it when they're in the kitchen; use 'or' for swaps like 'chicken or pork'.",
     inputSchema: {
       type: "object",
       properties: {
@@ -381,8 +382,8 @@ const TOOLS: Tool[] = [
 ];
 
 export const SERVER_INSTRUCTIONS =
-  "Life Planner is the user's household meal planner. Check get_fridge and list_recipes before suggesting meals, " +
-  "and favor dishes that use what's already in the fridge. Only save recipes or plan meals when the user asks.";
+  "Life Planner is the user's household meal planner. Check get_kitchen and list_recipes before suggesting meals, " +
+  "and favor dishes that use what's already in the kitchen. Only save recipes or plan meals when the user asks.";
 
 export function listTools() {
   return TOOLS.map((t) => ({

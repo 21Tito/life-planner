@@ -361,7 +361,7 @@ function RecipeDetailModal({
             <Button variant="outline" onClick={onEdit}>Edit</Button>
             <Button onClick={onDoneCooking} className="gap-1.5">
               {Icons.check}
-              {entry?.cooked_at ? "Update fridge" : "Done cooking"}
+              {entry?.cooked_at ? "Update kitchen" : "Done cooking"}
             </Button>
           </>
         )
@@ -401,11 +401,11 @@ function RecipeDetailModal({
             <>
               <p className="text-xs text-muted-foreground mb-2">
                 Star what this recipe can&apos;t do without, and it&apos;ll be suggested when those are in the
-                fridge. Write swaps with &ldquo;or&rdquo;, like &ldquo;chicken or pork&rdquo;.
+                kitchen. Write swaps with &ldquo;or&rdquo;, like &ldquo;chicken or pork&rdquo;.
               </p>
               <ul className="space-y-0.5">
                 {recipe.recipe_ingredients.map((ing) => {
-                  const inFridge = findPantryMatch(ing.name, pantry);
+                  const inKitchen = findPantryMatch(ing.name, pantry);
                   return (
                     <li key={ing.id} className="flex items-center gap-1.5">
                       <button
@@ -424,10 +424,10 @@ function RecipeDetailModal({
                         <StarIcon filled={ing.is_essential} />
                       </button>
                       <span
-                        className={cn("flex-shrink-0 w-4 flex justify-center", inFridge ? "text-green-600" : "text-muted-foreground/40")}
-                        title={inFridge ? `In fridge: ${inFridge.name}` : "Not in fridge"}
+                        className={cn("flex-shrink-0 w-4 flex justify-center", inKitchen ? "text-green-600" : "text-muted-foreground/40")}
+                        title={inKitchen ? `In kitchen: ${inKitchen.name}` : "Not in kitchen"}
                       >
-                        {inFridge ? Icons.check : "•"}
+                        {inKitchen ? Icons.check : "•"}
                       </span>
                       <span className={cn("py-1", ing.is_essential && "font-medium")}>{formatIngredient(ing)}</span>
                     </li>
