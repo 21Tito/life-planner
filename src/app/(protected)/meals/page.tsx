@@ -1,10 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
 import { getSessionIds } from "@/lib/get-owner-id";
-import type { MealPlanEntry, PantryItem, RecipeWithIngredients } from "@/types";
+import type { MealPlanEntry, PantryItem, RecipeWithIngredients, ShoppingItem } from "@/types";
 import { MealsClient, type MealsTab } from "./meals-client";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-const TABS: MealsTab[] = ["week", "recipes", "fridge"];
+const TABS: MealsTab[] = ["week", "recipes", "fridge", "shopping"];
 
 export default async function MealsPage({
   searchParams,
@@ -20,7 +20,7 @@ export default async function MealsPage({
   const entriesFrom = new Date(now - 8 * DAY_MS).toISOString().slice(0, 10);
   const entriesTo = new Date(now + 8 * DAY_MS).toISOString().slice(0, 10);
 
-  const [pantry, status, recipes, entries] = await Promise.all([
+  const [pantry, status, recipes, entries, shopping] = await Promise.all([
     supabase.from("pantry_items").select("*").eq("user_id", ownerId).order("name"),
     supabase.from("pantry_status").select("reviewed_at").eq("user_id", ownerId).maybeSingle(),
     supabase.from("recipes").select("*, recipe_ingredients(*)").eq("user_id", ownerId).order("title"),
@@ -30,6 +30,7 @@ export default async function MealsPage({
       .eq("user_id", ownerId)
       .gte("date", entriesFrom)
       .lte("date", entriesTo),
+    supabase.from("shopping_items").select("*").eq("user_id", ownerId).order("created_at"),
   ]);
 
   return (
@@ -40,6 +41,7 @@ export default async function MealsPage({
       initialRecipes={(recipes.data ?? []) as RecipeWithIngredients[]}
       initialEntries={(entries.data ?? []) as MealPlanEntry[]}
       initialEntriesRange={{ from: entriesFrom, to: entriesTo }}
+      initialShopping={(shopping.data ?? []) as ShoppingItem[]}
     />
   );
 }

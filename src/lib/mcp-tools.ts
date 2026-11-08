@@ -233,7 +233,7 @@ const TOOLS: Tool[] = [
       return days.map((date) => {
         const find = (slot: string) => entries.find((e) => e.date === date && e.slot === slot);
         const describe = (e: MealPlanEntry | undefined) =>
-          e ? { title: e.title, recipe_id: e.recipe_id } : null;
+          e ? { title: e.title, recipe_id: e.recipe_id, cooked: Boolean(e.cooked_at) } : null;
         return {
           date,
           day: new Date(`${date}T00:00:00`).toLocaleDateString("en-US", { weekday: "long" }),
@@ -369,7 +369,10 @@ const TOOLS: Tool[] = [
 
       const { error } = await ctx.admin
         .from("meal_plan_entries")
-        .upsert({ user_id: ctx.ownerId, date, slot, recipe_id: recipeId, title }, { onConflict: "user_id,date,slot" });
+        .upsert(
+          { user_id: ctx.ownerId, date, slot, recipe_id: recipeId, title, cooked_at: null },
+          { onConflict: "user_id,date,slot" }
+        );
       if (error) throw new Error(error.message);
 
       return { planned: { date, slot, title }, replaced: previous?.title ?? null };

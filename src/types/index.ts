@@ -144,5 +144,15 @@ export interface MealPlanEntry {
   slot: MealSlot;
   recipe_id: string | null;
   title: string;
+  cooked_at: string | null;
+  created_at: string;
+}
+
+export interface ShoppingItem {
+  id: string;
+  user_id: string;
+  name: string;
+  quantity: string | null;
+  checked: boolean;
   created_at: string;
 }

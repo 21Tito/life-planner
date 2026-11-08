@@ -3,12 +3,13 @@
 import { createClient } from "@/lib/supabase/client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useOwnerId } from "@/lib/household-context";
-import type { MealPlanEntry, PantryItem, RecipeWithIngredients } from "@/types";
+import type { MealPlanEntry, MealSlot, PantryItem, RecipeWithIngredients, ShoppingItem } from "@/types";
 import {
   PANTRY_REVIEW_INTERVAL_DAYS,
   PLANNED_WEEKDAYS,
   addDays,
   daysSince,
+  planningWeekStart,
   startOfWeek,
   toDateStr,
 } from "@/lib/meals";
@@ -16,13 +17,17 @@ import { cn } from "@/lib/utils";
 import { WeekView } from "./week-view";
 import { RecipesView } from "./recipes-view";
 import { FridgeView } from "./fridge-view";
+import { ShoppingView } from "./shopping-view";
 
-export type MealsTab = "week" | "recipes" | "fridge";
+export type MealsTab = "week" | "recipes" | "fridge" | "shopping";
+export type OpenRecipe = { id: string; entryId?: string } | null;
+export type EditingSlot = { date: string; slot: MealSlot } | null;
 
 const TAB_LABELS: { value: MealsTab; label: string }[] = [
   { value: "week", label: "This Week" },
   { value: "recipes", label: "Recipes" },
   { value: "fridge", label: "Fridge" },
+  { value: "shopping", label: "Shopping" },
 ];
 
 interface Props {
@@ -32,6 +37,7 @@ interface Props {
   initialRecipes: RecipeWithIngredients[];
   initialEntries: MealPlanEntry[];
   initialEntriesRange: { from: string; to: string };
+  initialShopping: ShoppingItem[];
 }
 
 function sortIngredients(recipes: RecipeWithIngredients[]): RecipeWithIngredients[] {
@@ -48,6 +54,7 @@ export function MealsClient({
   initialRecipes,
   initialEntries,
   initialEntriesRange,
+  initialShopping,
 }: Props) {
   const supabase = createClient();
   const ownerId = useOwnerId();
@@ -57,7 +64,9 @@ export function MealsClient({
   const [reviewedAt, setReviewedAt] = useState<string | null>(initialReviewedAt);
   const [recipes, setRecipes] = useState<RecipeWithIngredients[]>(() => sortIngredients(initialRecipes));
   const [entries, setEntries] = useState<MealPlanEntry[]>(initialEntries);
-  const [openRecipeId, setOpenRecipeId] = useState<string | null>(null);
+  const [shoppingItems, setShoppingItems] = useState<ShoppingItem[]>(initialShopping);
+  const [openRecipe, setOpenRecipe] = useState<OpenRecipe>(null);
+  const [editingSlot, setEditingSlot] = useState<EditingSlot>(null);
 
   // Dates depend on the viewer's timezone, so they're only computed after mount
   const [now, setNow] = useState<Date | null>(null);
@@ -76,7 +85,7 @@ export function MealsClient({
       }
     }
     setNow(today);
-    setWeekStart(thisWeek);
+    setWeekStart(planningWeekStart(today));
   }, [initialEntriesRange.from, initialEntriesRange.to]);
 
   const goToWeek = useCallback(
@@ -144,6 +153,11 @@ export function MealsClient({
             )}
           >
             {label}
+            {value === "shopping" && shoppingItems.some((i) => !i.checked) && (
+              <span className="ml-1.5 tabular-nums opacity-80">
+                {shoppingItems.filter((i) => !i.checked).length}
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -175,8 +189,10 @@ export function MealsClient({
           setEntries={setEntries}
           recipes={recipes}
           pantry={pantry}
-          setPantry={setPantry}
-          onOpenRecipe={setOpenRecipeId}
+          shoppingItems={shoppingItems}
+          editingSlot={editingSlot}
+          setEditingSlot={setEditingSlot}
+          onOpenRecipe={(id, entryId) => setOpenRecipe({ id, entryId })}
           onGoToTab={switchTab}
         />
       )}
@@ -188,15 +204,35 @@ export function MealsClient({
           onReviewed={setReviewedAt}
         />
       )}
+      {tab === "shopping" && (
+        <ShoppingView
+          items={shoppingItems}
+          setItems={setShoppingItems}
+          setPantry={setPantry}
+          weekStart={weekStart}
+          entries={entries}
+          recipes={recipes}
+          pantry={pantry}
+        />
+      )}
       {/* Recipes view also hosts the recipe modals opened from the week grid */}
       <RecipesView
         visible={tab === "recipes"}
         recipes={recipes}
         setRecipes={setRecipes}
+        entries={entries}
         setEntries={setEntries}
         pantry={pantry}
-        openRecipeId={openRecipeId}
-        onOpenRecipe={setOpenRecipeId}
+        setPantry={setPantry}
+        shoppingItems={shoppingItems}
+        setShoppingItems={setShoppingItems}
+        openRecipe={openRecipe}
+        onOpenRecipe={setOpenRecipe}
+        onChangeMeal={(entry) => {
+          setOpenRecipe(null);
+          setEditingSlot({ date: entry.date, slot: entry.slot });
+          switchTab("week");
+        }}
       />
     </div>
   );

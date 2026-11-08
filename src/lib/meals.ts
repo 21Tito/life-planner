@@ -27,6 +27,12 @@ export function startOfWeek(d: Date): Date {
   return addDays(d, -daysSinceMonday);
 }
 
+/** The week to plan: this week on weekdays, next week on Saturday and Sunday. */
+export function planningWeekStart(d: Date): Date {
+  const day = d.getDay();
+  return startOfWeek(addDays(d, day === 6 ? 2 : day === 0 ? 1 : 0));
+}
+
 export function weekDates(weekStart: Date): Date[] {
   return Array.from({ length: PLANNED_WEEKDAYS }, (_, i) => addDays(weekStart, i));
 }
@@ -326,6 +332,16 @@ export const PANTRY_CATEGORIES: { value: PantryCategory; label: string }[] = [
   { value: "beverage", label: "Drinks" },
   { value: "other", label: "Other" },
 ];
+
+// Roughly the order you walk a grocery store: produce first, then proteins and dairy
+export const STORE_CATEGORY_ORDER: PantryCategory[] = [
+  "vegetable", "fruit", "protein", "dairy", "grain", "frozen", "condiment", "spice", "beverage", "other",
+];
+
+/** Whether something with this name is already on the list (same loose matching as the fridge). */
+export function isOnList(name: string, items: { name: string }[]): boolean {
+  return findPantryMatch(name, items as PantryItem[]) !== null;
+}
 
 const CATEGORY_KEYWORDS: [PantryCategory, string[]][] = [
   ["protein", ["chicken", "turkey", "beef", "pork", "steak", "salmon", "tuna", "shrimp", "fish", "tofu", "tempeh", "chickpea", "lentil", "sausage", "bacon", "ham", "lamb", "cod", "tilapia"]],

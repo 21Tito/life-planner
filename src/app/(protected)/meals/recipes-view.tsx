@@ -3,7 +3,7 @@
 import { createClient } from "@/lib/supabase/client";
 import { useState } from "react";
 import { useOwnerId } from "@/lib/household-context";
-import type { MealPlanEntry, PantryItem, RecipeIngredient, RecipeWithIngredients } from "@/types";
+import type { MealPlanEntry, PantryItem, RecipeIngredient, RecipeWithIngredients, ShoppingItem } from "@/types";
 import {
   findPantryMatch,
   formatIngredient,
@@ -15,6 +15,8 @@ import {
 import type { ImportedRecipe } from "@/lib/recipe-import";
 import { cn } from "@/lib/utils";
 import { ReadinessText, StarIcon } from "./readiness";
+import { DoneCookingModal } from "./done-cooking";
+import type { OpenRecipe } from "./meals-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -27,10 +29,15 @@ interface Props {
   visible: boolean;
   recipes: RecipeWithIngredients[];
   setRecipes: React.Dispatch<React.SetStateAction<RecipeWithIngredients[]>>;
+  entries: MealPlanEntry[];
   setEntries: React.Dispatch<React.SetStateAction<MealPlanEntry[]>>;
   pantry: PantryItem[];
-  openRecipeId: string | null;
-  onOpenRecipe: (id: string | null) => void;
+  setPantry: React.Dispatch<React.SetStateAction<PantryItem[]>>;
+  shoppingItems: ShoppingItem[];
+  setShoppingItems: React.Dispatch<React.SetStateAction<ShoppingItem[]>>;
+  openRecipe: OpenRecipe;
+  onOpenRecipe: (open: OpenRecipe) => void;
+  onChangeMeal: (entry: MealPlanEntry) => void;
 }
 
 interface RecipeDraft {
@@ -70,8 +77,13 @@ export function RecipesView({
   setRecipes,
   setEntries,
   pantry,
-  openRecipeId,
+  entries,
+  openRecipe: open,
   onOpenRecipe,
+  onChangeMeal,
+  setPantry,
+  shoppingItems,
+  setShoppingItems,
 }: Props) {
   const supabase = createClient();
   const ownerId = useOwnerId();
@@ -79,7 +91,9 @@ export function RecipesView({
   // null = closed, "new" = creating, otherwise the recipe being edited
   const [editing, setEditing] = useState<RecipeWithIngredients | "new" | null>(null);
 
-  const openRecipe = openRecipeId ? recipes.find((r) => r.id === openRecipeId) : undefined;
+  const [cooking, setCooking] = useState(false);
+  const openRecipe = open ? recipes.find((r) => r.id === open.id) : undefined;
+  const openEntry = open?.entryId ? entries.find((e) => e.id === open.entryId) : undefined;
   const query = search.trim().toLowerCase();
   const filtered = recipes.filter((r) => r.title.toLowerCase().includes(query));
 
@@ -150,7 +164,7 @@ export function RecipesView({
     const saved: RecipeWithIngredients = { ...recipe, recipe_ingredients: ingredients };
     setRecipes((prev) => [...prev.filter((r) => r.id !== saved.id), saved].sort(byTitle));
     // Show the new recipe so its pre-starred essentials can be reviewed
-    if (!existing) onOpenRecipe(saved.id);
+    if (!existing) onOpenRecipe({ id: saved.id });
     return null;
   }
 
@@ -221,7 +235,7 @@ export function RecipesView({
                 const href = safeHref(recipe.source_url);
                 const readiness = recipeReadiness(recipe, pantry);
                 return (
-                  <button key={recipe.id} onClick={() => onOpenRecipe(recipe.id)} className="text-left">
+                  <button key={recipe.id} onClick={() => onOpenRecipe({ id: recipe.id })} className="text-left">
                     <Card className="h-full hover:ring-primary/30 hover:shadow-md transition-all">
                       <CardContent>
                         <h3 className="font-semibold">{recipe.title}</h3>
@@ -244,9 +258,29 @@ export function RecipesView({
         </div>
       )}
 
-      {openRecipe && !editing && (
+      {openRecipe && cooking && (
+        <DoneCookingModal
+          recipe={openRecipe}
+          entry={openEntry}
+          pantry={pantry}
+          shoppingItems={shoppingItems}
+          setPantry={setPantry}
+          setShoppingItems={setShoppingItems}
+          setEntries={setEntries}
+          onClose={() => setCooking(false)}
+          onDone={() => {
+            setCooking(false);
+            onOpenRecipe(null);
+          }}
+        />
+      )}
+
+      {openRecipe && !editing && !cooking && (
         <RecipeDetailModal
           recipe={openRecipe}
+          entry={openEntry}
+          onChangeMeal={openEntry ? () => onChangeMeal(openEntry) : undefined}
+          onDoneCooking={() => setCooking(true)}
           pantry={pantry}
           onClose={() => onOpenRecipe(null)}
           onEdit={() => setEditing(openRecipe)}
@@ -268,14 +302,21 @@ export function RecipesView({
 
 function RecipeDetailModal({
   recipe,
+  entry,
   pantry,
   onClose,
   onEdit,
   onDelete,
   onToggleEssential,
+  onChangeMeal,
+  onDoneCooking,
 }: {
   recipe: RecipeWithIngredients;
+  /** Set when opened from a planned meal */
+  entry?: MealPlanEntry;
   pantry: PantryItem[];
+  onChangeMeal?: () => void;
+  onDoneCooking: () => void;
   onClose: () => void;
   onEdit: () => void;
   onDelete: () => Promise<string | null>;
@@ -308,15 +349,32 @@ function RecipeDetailModal({
           </>
         ) : (
           <>
-            <Button variant="destructive" onClick={() => setConfirmingDelete(true)} className="mr-auto">
-              Delete
+            {onChangeMeal ? (
+              <Button variant="outline" onClick={onChangeMeal} className="mr-auto">
+                Change meal
+              </Button>
+            ) : (
+              <Button variant="destructive" onClick={() => setConfirmingDelete(true)} className="mr-auto">
+                Delete
+              </Button>
+            )}
+            <Button variant="outline" onClick={onEdit}>Edit</Button>
+            <Button onClick={onDoneCooking} className="gap-1.5">
+              {Icons.check}
+              {entry?.cooked_at ? "Update fridge" : "Done cooking"}
             </Button>
-            <Button onClick={onEdit}>Edit</Button>
           </>
         )
       }
     >
       <div className="space-y-5 text-sm">
+        {entry && (
+          <p className="text-xs text-muted-foreground -mt-1">
+            Planned for{" "}
+            {new Date(`${entry.date}T00:00:00`).toLocaleDateString("en-US", { weekday: "long" })} {entry.slot}
+            {entry.cooked_at && <span className="text-green-700 font-medium"> · Cooked ✓</span>}
+          </p>
+        )}
         {href && (
           <a
             href={href}
