@@ -4,7 +4,15 @@ import { createClient } from "@/lib/supabase/client";
 import { useState } from "react";
 import { useOwnerId } from "@/lib/household-context";
 import type { MealPlanEntry, PantryCategory, PantryItem, RecipeWithIngredients, ShoppingItem } from "@/types";
-import { findPantryMatch, guessCategory, isOnList } from "@/lib/meals";
+import {
+  FROZEN_MEAL_KEEPS_MONTHS,
+  expiryInMonths,
+  findPantryMatch,
+  formatExpiry,
+  guessCategory,
+  isOnList,
+} from "@/lib/meals";
+import { Icons } from "@/components/ui/icons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -58,6 +66,8 @@ export function DoneCookingModal({
 
   const [choices, setChoices] = useState<Record<string, Choice>>({});
   const [extra, setExtra] = useState("");
+  const [froze, setFroze] = useState(false);
+  const freezeUntil = expiryInMonths(new Date(), FROZEN_MEAL_KEEPS_MONTHS);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -111,6 +121,26 @@ export function DoneCookingModal({
       setPantry((prev) => prev.filter((p) => !ids.includes(p.id)));
     }
 
+    if (froze) {
+      const { data, error } = await supabase
+        .from("pantry_items")
+        .insert({
+          user_id: ownerId,
+          name: recipe.title.slice(0, 200),
+          category: "frozen",
+          expiry_date: freezeUntil,
+          recipe_id: recipe.id,
+        })
+        .select()
+        .single();
+      if (error || !data) {
+        setSaving(false);
+        setError(error?.message ?? "Couldn't add the leftovers to the freezer.");
+        return;
+      }
+      setPantry((prev) => [...prev, data as PantryItem]);
+    }
+
     if (entry && !entry.cooked_at) {
       const cooked_at = new Date().toISOString();
       const { error } = await supabase.from("meal_plan_entries").update({ cooked_at }).eq("id", entry.id);
@@ -133,7 +163,7 @@ export function DoneCookingModal({
         <>
           <Button variant="outline" onClick={onClose}>Back to recipe</Button>
           <Button onClick={save} disabled={saving}>
-            {saving ? "Saving…" : outCount || buyCount ? "Save" : entry && !entry.cooked_at ? "Mark as cooked" : "Done"}
+            {saving ? "Saving…" : outCount || buyCount || froze ? "Save" : entry && !entry.cooked_at ? "Mark as cooked" : "Done"}
           </Button>
         </>
       }
@@ -178,6 +208,24 @@ export function DoneCookingModal({
             </ul>
           </div>
         )}
+
+        <label className="flex items-start gap-3 rounded-lg ring-1 ring-sky-200 bg-sky-50/50 px-3 py-2.5 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={froze}
+            onChange={(e) => setFroze(e.target.checked)}
+            className="mt-0.5 w-4 h-4 accent-sky-600"
+          />
+          <span className="text-sm">
+            <span className="font-medium flex items-center gap-1.5">
+              <span className="text-sky-600">{Icons.snowflake}</span>
+              Froze leftovers
+            </span>
+            <span className="block text-xs text-muted-foreground mt-0.5">
+              Adds {recipe.title} to the freezer, good until {formatExpiry(freezeUntil)}. Plan it later from any meal slot.
+            </span>
+          </span>
+        </label>
 
         <div>
           <label className="block text-sm font-medium mb-1.5">

@@ -129,7 +129,7 @@ const TOOLS: Tool[] = [
     name: "get_kitchen",
     title: "Get kitchen inventory",
     description:
-      "Lists what's currently in the household's kitchen (fridge and pantry), with categories, expiration month for spices and sauces, and when it was last reviewed.",
+      "Lists what's currently in the household's kitchen (fridge and pantry), with categories, expiration month for spices, sauces, and frozen food, which frozen items are leftover meals, and when it was last reviewed.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
     readOnly: true,
     async handler(_args, ctx) {
@@ -139,7 +139,12 @@ const TOOLS: Tool[] = [
       ]);
       return {
         last_reviewed: status.data?.reviewed_at ?? null,
-        items: items.map((i) => ({ name: i.name, category: i.category, expires: i.expiry_date ? formatExpiry(i.expiry_date) : null })),
+        items: items.map((i) => ({
+          name: i.name,
+          category: i.category,
+          expires: i.expiry_date ? formatExpiry(i.expiry_date) : null,
+          frozen_leftovers: Boolean(i.recipe_id),
+        })),
       };
     },
   },
@@ -370,7 +375,7 @@ const TOOLS: Tool[] = [
       const { error } = await ctx.admin
         .from("meal_plan_entries")
         .upsert(
-          { user_id: ctx.ownerId, date, slot, recipe_id: recipeId, title, cooked_at: null },
+          { user_id: ctx.ownerId, date, slot, recipe_id: recipeId, title, pantry_item_id: null, cooked_at: null },
           { onConflict: "user_id,date,slot" }
         );
       if (error) throw new Error(error.message);

@@ -173,6 +173,7 @@ export function MealsClient({
           setEntries={setEntries}
           recipes={recipes}
           pantry={pantry}
+          setPantry={setPantry}
           shoppingItems={shoppingItems}
           editingSlot={editingSlot}
           setEditingSlot={setEditingSlot}

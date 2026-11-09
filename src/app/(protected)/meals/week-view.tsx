@@ -7,6 +7,9 @@ import type { MealPlanEntry, MealSlot, PantryItem, RecipeWithIngredients, Shoppi
 import {
   addDays,
   buildShoppingList,
+  expiryStatus,
+  formatExpiry,
+  isLeftoverMeal,
   isOnList,
   recipeReadiness,
   suggestRecipes,
@@ -33,6 +36,7 @@ interface Props {
   setEntries: React.Dispatch<React.SetStateAction<MealPlanEntry[]>>;
   recipes: RecipeWithIngredients[];
   pantry: PantryItem[];
+  setPantry: React.Dispatch<React.SetStateAction<PantryItem[]>>;
   shoppingItems: ShoppingItem[];
   editingSlot: EditingSlot;
   setEditingSlot: (slot: EditingSlot) => void;
@@ -57,6 +61,7 @@ export function WeekView({
   setEntries,
   recipes,
   pantry,
+  setPantry,
   shoppingItems,
   editingSlot,
   setEditingSlot,
@@ -141,6 +146,11 @@ export function WeekView({
                         )}
                       >
                         {cooked && <span className="text-green-700 mr-1" aria-label="Cooked">✓</span>}
+                        {entry?.pantry_item_id && !cooked && (
+                          <span className="inline-block align-[-2px] mr-1 text-sky-600" aria-label="From the freezer">
+                            {Icons.snowflake}
+                          </span>
+                        )}
                         {label ?? `+ Add ${slot}`}
                       </button>
                     </div>
@@ -183,6 +193,7 @@ export function WeekView({
           entry={editingEntry}
           recipes={recipes}
           pantry={pantry}
+          setPantry={setPantry}
           onClose={() => setEditingSlot(null)}
           setEntries={setEntries}
           onOpenRecipe={onOpenRecipe}
@@ -196,10 +207,13 @@ export function WeekView({
 type SupabaseBrowser = ReturnType<typeof createClient>;
 
 /** Plans a slot; a newly planned meal always starts out not cooked. */
-function upsertEntry(supabase: SupabaseBrowser, values: Omit<MealPlanEntry, "id" | "created_at" | "cooked_at">) {
+function upsertEntry(
+  supabase: SupabaseBrowser,
+  values: Omit<MealPlanEntry, "id" | "created_at" | "cooked_at" | "pantry_item_id"> & { pantry_item_id?: string | null }
+) {
   return supabase
     .from("meal_plan_entries")
-    .upsert({ ...values, cooked_at: null }, { onConflict: "user_id,date,slot" })
+    .upsert({ ...values, pantry_item_id: values.pantry_item_id ?? null, cooked_at: null }, { onConflict: "user_id,date,slot" })
     .select()
     .single();
 }
@@ -321,6 +335,7 @@ function SlotModal({
   entry,
   recipes,
   pantry,
+  setPantry,
   onClose,
   setEntries,
   onOpenRecipe,
@@ -331,6 +346,7 @@ function SlotModal({
   entry: MealPlanEntry | undefined;
   recipes: RecipeWithIngredients[];
   pantry: PantryItem[];
+  setPantry: React.Dispatch<React.SetStateAction<PantryItem[]>>;
   onClose: () => void;
   setEntries: React.Dispatch<React.SetStateAction<MealPlanEntry[]>>;
   onOpenRecipe: (id: string, entryId?: string) => void;
@@ -339,7 +355,7 @@ function SlotModal({
   const supabase = createClient();
   const ownerId = useOwnerId();
   const [search, setSearch] = useState("");
-  const [note, setNote] = useState(entry && !entry.recipe_id ? entry.title : "");
+  const [note, setNote] = useState(entry && !entry.recipe_id && !entry.pantry_item_id ? entry.title : "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -359,11 +375,16 @@ function SlotModal({
     });
   const matches = ranked.filter(({ recipe }) => recipe.title.toLowerCase().includes(query));
   const linkedRecipe = entry?.recipe_id ? recipes.find((r) => r.id === entry.recipe_id) : undefined;
+  const now = new Date();
+  // Oldest first, so whatever should be eaten soonest is at the top
+  const freezer = pantry
+    .filter((p) => p.category === "frozen")
+    .sort((a, b) => (a.expiry_date ?? "9999").localeCompare(b.expiry_date ?? "9999") || a.name.localeCompare(b.name));
 
-  async function save(recipe_id: string | null, title: string) {
+  async function save(recipe_id: string | null, title: string, pantry_item_id: string | null = null) {
     setSaving(true);
     setError(null);
-    const { data, error } = await upsertEntry(supabase, { user_id: ownerId, date, slot, recipe_id, title });
+    const { data, error } = await upsertEntry(supabase, { user_id: ownerId, date, slot, recipe_id, title, pantry_item_id });
     setSaving(false);
     if (error || !data) {
       setError(error?.message ?? "Couldn't save this meal.");
@@ -373,6 +394,31 @@ function SlotModal({
       ...prev.filter((e) => !(e.date === date && e.slot === slot)),
       data as MealPlanEntry,
     ]);
+    onClose();
+  }
+
+  /** A freezer meal was eaten: take it out of the kitchen and tick the meal off. */
+  async function markEaten() {
+    if (!entry) return;
+    setSaving(true);
+    setError(null);
+    if (entry.pantry_item_id) {
+      const { error } = await supabase.from("pantry_items").delete().eq("id", entry.pantry_item_id);
+      if (error) {
+        setSaving(false);
+        setError(error.message);
+        return;
+      }
+      setPantry((prev) => prev.filter((p) => p.id !== entry.pantry_item_id));
+    }
+    const cooked_at = new Date().toISOString();
+    const { error } = await supabase.from("meal_plan_entries").update({ cooked_at }).eq("id", entry.id);
+    setSaving(false);
+    if (error) {
+      setError(error.message);
+      return;
+    }
+    setEntries((prev) => prev.map((e) => (e.id === entry.id ? { ...e, cooked_at } : e)));
     onClose();
   }
 
@@ -408,14 +454,73 @@ function SlotModal({
                 View recipe
               </Button>
             )}
-            <Button variant="destructive" onClick={clear} disabled={saving}>
+            <Button variant="destructive" onClick={clear} disabled={saving} className={linkedRecipe ? undefined : "mr-auto"}>
               Clear {slot}
             </Button>
+            {entry.pantry_item_id && !entry.cooked_at && (
+              <Button onClick={markEaten} disabled={saving} className="gap-1.5">
+                {Icons.check}
+                Mark as eaten
+              </Button>
+            )}
           </>
         ) : undefined
       }
     >
       <div className="space-y-5">
+        {entry?.pantry_item_id && (
+          <p className="text-sm text-muted-foreground flex items-center gap-1.5">
+            <span className="text-sky-600">{Icons.snowflake}</span>
+            {entry.cooked_at ? "Eaten from the freezer." : "From the freezer. Mark it eaten when it's gone."}
+          </p>
+        )}
+
+        {freezer.length > 0 && (
+          <div>
+            <FieldLabel>From the freezer</FieldLabel>
+            <ul className="max-h-48 overflow-y-auto rounded-lg ring-1 ring-sky-200 bg-sky-50/40 divide-y divide-sky-100">
+              {freezer.map((item) => {
+                const status = item.expiry_date ? expiryStatus(item.expiry_date, now) : null;
+                const selected = entry?.pantry_item_id === item.id;
+                return (
+                  <li key={item.id}>
+                    <button
+                      onClick={() => save(null, item.name, item.id)}
+                      disabled={saving}
+                      className={cn(
+                        "w-full text-left px-3 py-2.5 text-sm hover:bg-sky-50 transition-colors flex items-center justify-between gap-3",
+                        selected && "bg-sky-100 font-medium"
+                      )}
+                    >
+                      <span className="flex items-center gap-2 min-w-0">
+                        <span className="text-sky-600 flex-shrink-0">{Icons.snowflake}</span>
+                        <span className="truncate">{item.name}</span>
+                        {isLeftoverMeal(item) && !/leftover/i.test(item.name) && (
+                          <span className="text-[11px] text-muted-foreground flex-shrink-0">Leftovers</span>
+                        )}
+                      </span>
+                      {selected ? (
+                        <span className="text-primary flex-shrink-0">{Icons.check}</span>
+                      ) : (
+                        item.expiry_date && (
+                          <span
+                            className={cn(
+                              "text-xs flex-shrink-0",
+                              status === "expired" ? "text-red-600" : status === "soon" ? "text-amber-700" : "text-muted-foreground"
+                            )}
+                          >
+                            {status === "expired" ? "Expired" : "Use by"} {formatExpiry(item.expiry_date)}
+                          </span>
+                        )
+                      )}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
+
         <div>
           <FieldLabel>Pick a recipe</FieldLabel>
           {recipes.length === 0 ? (

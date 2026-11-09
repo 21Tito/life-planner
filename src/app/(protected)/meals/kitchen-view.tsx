@@ -11,6 +11,7 @@ import {
   expiryStatus,
   formatExpiry,
   guessCategory,
+  isLeftoverMeal,
 } from "@/lib/meals";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -199,6 +200,7 @@ export function KitchenView({ pantry, setPantry, reviewAge, onReviewed, now }: P
                       className="flex-1 min-w-0 text-left py-1.5 text-sm flex flex-wrap items-baseline gap-x-2"
                     >
                       <span className="font-medium">{item.name}</span>
+                      {isLeftoverMeal(item) && !/leftover/i.test(item.name) && <span className="text-[11px] font-medium text-sky-700">Leftovers</span>}
                       {item.expiry_date && <ExpiryLabel expiry={item.expiry_date} now={now} />}
                     </button>
                     <button

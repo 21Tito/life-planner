@@ -1,13 +1,16 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
 import type { MealPlanEntry, MealSlot, PantryItem, RecipeWithIngredients, Trip } from "@/types";
 import {
   EXPIRY_CATEGORIES,
   PANTRY_REVIEW_INTERVAL_DAYS,
   daysSince,
   expiryStatus,
+  isLeftoverMeal,
   readinessLabel,
   recipeReadiness,
   PLANNED_DAYS,
@@ -50,6 +53,8 @@ export function DashboardClient({ entries, recipes, pantry, shoppingCount, trips
   const week = dayRange(midnight, PLANNED_DAYS);
 
   const nextTrip = trips.find((t) => t.end_date >= today);
+  const frozen = pantry.filter((p) => p.category === "frozen");
+  const frozenMeals = frozen.filter(isLeftoverMeal).length;
 
   const expiring = pantry.filter(
     (p) => p.expiry_date && EXPIRY_CATEGORIES.includes(p.category) && expiryStatus(p.expiry_date, now) !== "ok"
@@ -112,6 +117,9 @@ export function DashboardClient({ entries, recipes, pantry, shoppingCount, trips
                       >
                         {label ?? "Nothing planned"}
                       </span>
+                      {dinner?.pantry_item_id && !dinner.cooked_at && (
+                        <span className="text-sky-600" aria-label="From the freezer">{Icons.snowflake}</span>
+                      )}
                       {dinner?.cooked_at && <span className="text-green-700 text-sm" aria-label="Cooked">✓</span>}
                       {isToday && (
                         <span className="rounded-full bg-green-600 text-white text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5">
@@ -133,6 +141,19 @@ export function DashboardClient({ entries, recipes, pantry, shoppingCount, trips
               icon={Icons.check}
               title="Shopping list"
               detail={`${shoppingCount} item${shoppingCount === 1 ? "" : "s"} to buy`}
+            />
+          )}
+          {frozen.length > 0 && (
+            <SideCard
+              href="/meals?tab=kitchen"
+              icon={Icons.snowflake}
+              title="Freezer"
+              detail={[
+                `${frozen.length} item${frozen.length === 1 ? "" : "s"}`,
+                frozenMeals > 0 && `${frozenMeals} leftover meal${frozenMeals === 1 ? "" : "s"}`,
+              ]
+                .filter(Boolean)
+                .join(" · ")}
             />
           )}
           {nextTrip ? (
@@ -180,9 +201,28 @@ function Tonight({
   recipesById: Map<string, RecipeWithIngredients>;
   pantry: PantryItem[];
 }) {
+  const router = useRouter();
   const recipe = dinner?.recipe_id ? recipesById.get(dinner.recipe_id) : undefined;
   const readiness = recipe ? recipeReadiness(recipe, pantry) : null;
   const lunchRecipe = lunch?.recipe_id ? recipesById.get(lunch.recipe_id) : undefined;
+  const fromFreezer = Boolean(dinner?.pantry_item_id);
+  const [eating, setEating] = useState(false);
+  const [eaten, setEaten] = useState(false);
+
+  async function markEaten() {
+    if (!dinner?.pantry_item_id) return;
+    setEating(true);
+    const supabase = createClient();
+    const removed = await supabase.from("pantry_items").delete().eq("id", dinner.pantry_item_id);
+    const ticked = removed.error
+      ? removed
+      : await supabase.from("meal_plan_entries").update({ cooked_at: new Date().toISOString() }).eq("id", dinner.id);
+    setEating(false);
+    if (!ticked.error) {
+      setEaten(true);
+      router.refresh();
+    }
+  }
 
   return (
     <section className="rounded-2xl bg-[var(--color-brand-600)] text-white p-5 lg:p-6 shadow-lg">
@@ -194,15 +234,29 @@ function Tonight({
             {recipe?.title ?? dinner.title}
           </h2>
           <p className="mt-1.5 text-sm text-white/80">
-            {dinner.cooked_at
-              ? "Cooked ✓"
-              : readiness && readiness.total > 0
-                ? readinessLabel(readiness)
-                : !recipe
-                  ? "Not a saved recipe"
-                  : ""}
+            {dinner.cooked_at || eaten
+              ? fromFreezer
+                ? "Eaten ✓"
+                : "Cooked ✓"
+              : fromFreezer
+                ? "From the freezer, just reheat"
+                : readiness && readiness.total > 0
+                  ? readinessLabel(readiness)
+                  : !recipe
+                    ? "Not a saved recipe"
+                    : ""}
           </p>
           <div className="mt-5 flex flex-wrap gap-2">
+            {fromFreezer && !dinner.cooked_at && !eaten && (
+              <button
+                onClick={markEaten}
+                disabled={eating}
+                className="inline-flex items-center gap-2 rounded-full bg-white text-[var(--color-brand-600)] px-5 h-11 text-sm font-semibold shadow-sm active:scale-95 transition-transform disabled:opacity-60"
+              >
+                {Icons.check}
+                {eating ? "Saving…" : "Mark as eaten"}
+              </button>
+            )}
             {recipe && (
               <Link
                 href={recipeHref(dinner)}

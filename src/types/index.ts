@@ -107,6 +107,8 @@ export interface PantryItem {
   category: PantryCategory;
   quantity: string | null;
   expiry_date: string | null;
+  /** Set for frozen leftovers of a recipe */
+  recipe_id: string | null;
   created_at: string;
 }
 
@@ -144,6 +146,8 @@ export interface MealPlanEntry {
   slot: MealSlot;
   recipe_id: string | null;
   title: string;
+  /** Set when the meal comes out of the freezer */
+  pantry_item_id: string | null;
   cooked_at: string | null;
   created_at: string;
 }

@@ -60,6 +60,15 @@ export const Icons = {
       <path d="M5 9.5V20a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V9.5"/>
     </svg>
   ),
+  snowflake: (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="12" y1="2" x2="12" y2="22"/>
+      <line x1="4.9" y1="7" x2="19.1" y2="17"/>
+      <line x1="4.9" y1="17" x2="19.1" y2="7"/>
+      <path d="m9 4 3 2 3-2"/>
+      <path d="m9 20 3-2 3 2"/>
+    </svg>
+  ),
   map: (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/>

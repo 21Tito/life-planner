@@ -74,7 +74,7 @@ const IGNORED_WORDS = new Set([
   "peeled", "cubed", "large", "medium", "small", "boneless", "skinless", "organic",
   "finely", "roughly", "thinly", "optional", "divided", "can", "canned", "jar",
   "package", "of", "a", "an", "the", "and", "or", "to", "taste", "for",
-  "about", "approximately", "such", "as", "like", "any", "your", "favorite", "choice",
+  "about", "approximately", "such", "as", "like", "any", "your", "favorite", "choice", "frozen",
   // Units, for names where the amount wasn't split off or sits in parentheses
   "g", "l", "oz", "ounce", "ounces", "lb", "lbs", "pound", "pounds", "gram", "grams", "kg",
   "ml", "cup", "cups", "tbsp", "tsp", "tablespoon", "tablespoons", "teaspoon", "teaspoons",
@@ -171,7 +171,16 @@ function isGenericMeat(tokens: string[]): boolean {
   return core.length === 1 && core[0] === "meat";
 }
 
+const LEFTOVER_PATTERN = /\bleft\s?overs?\b/i;
+
+/** Frozen leftovers from Done cooking, or anything named like "Leftover chili". */
+export function isLeftoverMeal(item: Pick<PantryItem, "name" | "recipe_id">): boolean {
+  return Boolean(item.recipe_id) || LEFTOVER_PATTERN.test(item.name);
+}
+
 export function findPantryMatch(name: string, pantry: PantryItem[]): PantryItem | null {
+  // Leftovers are prepared meals, not ingredients
+  pantry = pantry.filter((p) => !isLeftoverMeal(p));
   for (const tokens of alternatives(name)) {
     const match = isGenericMeat(tokens)
       ? pantry.find((p) => ingredientTokens(p.name).some((t) => MEATS.has(t)))
@@ -330,12 +339,19 @@ export const PANTRY_CATEGORIES: { value: PantryCategory; label: string }[] = [
 
 // ── Expiration (month/year) for long-lasting items ───────────────────────────
 
-export const EXPIRY_CATEGORIES: PantryCategory[] = ["spice", "condiment"];
+export const EXPIRY_CATEGORIES: PantryCategory[] = ["spice", "condiment", "frozen"];
+export const FROZEN_MEAL_KEEPS_MONTHS = 3;
 const EXPIRING_SOON_DAYS = 31;
 
 /** Stored as the first of the month ("2027-03-01"); the item is good through the end of that month. */
 export function expiryDate(year: number, month: number): string {
   return `${year}-${String(month).padStart(2, "0")}-01`;
+}
+
+/** The expiry `months` calendar months after `from`, e.g. for freezer meals. */
+export function expiryInMonths(from: Date, months: number): string {
+  const d = new Date(from.getFullYear(), from.getMonth() + months, 1);
+  return expiryDate(d.getFullYear(), d.getMonth() + 1);
 }
 
 export function formatExpiry(expiry: string): string {
@@ -373,6 +389,7 @@ const CATEGORY_KEYWORDS: [PantryCategory, string[]][] = [
 ];
 
 export function guessCategory(name: string): PantryCategory {
+  if (LEFTOVER_PATTERN.test(name) || /\bfrozen\b/i.test(name)) return "frozen";
   const tokens = ingredientTokens(name);
   // The last word usually names the item: "cherry tomatoes", "chicken breast"
   for (const token of [...tokens].reverse()) {
