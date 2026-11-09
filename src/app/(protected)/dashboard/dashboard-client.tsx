@@ -64,8 +64,8 @@ export function DashboardClient({ entries, recipes, pantry, shoppingCount, trips
         {now.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
       </p>
 
-      <div className="grid gap-4 lg:grid-cols-3 lg:items-start">
-        <div className="space-y-4 lg:col-span-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:items-start">
+        <div className="space-y-4 lg:col-span-2 min-w-0">
           <Tonight
             dinner={entryFor(today, "dinner")}
             lunch={entryFor(today, "lunch")}
@@ -126,7 +126,7 @@ export function DashboardClient({ entries, recipes, pantry, shoppingCount, trips
           </section>
         </div>
 
-        <div className="space-y-3">
+        <div className="space-y-3 min-w-0">
           {shoppingCount > 0 && (
             <SideCard
               href="/meals?tab=shopping"
@@ -241,7 +241,7 @@ function Tonight({
           className="mt-5 pt-4 border-t border-white/15 flex items-center justify-between gap-3 text-sm hover:opacity-90"
         >
           <span className="text-white/70">Lunch</span>
-          <span className="font-medium truncate">{lunchRecipe?.title ?? lunch.title}</span>
+          <span className="font-medium truncate min-w-0">{lunchRecipe?.title ?? lunch.title}</span>
         </Link>
       )}
     </section>
@@ -313,12 +313,12 @@ function DashboardSkeleton() {
   return (
     <div className="max-w-5xl animate-pulse">
       <div className="h-4 w-40 bg-[var(--color-border)] rounded mb-3" />
-      <div className="grid gap-4 lg:grid-cols-3">
-        <div className="space-y-4 lg:col-span-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <div className="space-y-4 lg:col-span-2 min-w-0">
           <div className="h-48 rounded-2xl bg-[var(--color-border)]" />
           <div className="h-80 rounded-2xl bg-[var(--color-border)]" />
         </div>
-        <div className="space-y-3">
+        <div className="space-y-3 min-w-0">
           <div className="h-[72px] rounded-2xl bg-[var(--color-border)]" />
           <div className="h-[72px] rounded-2xl bg-[var(--color-border)]" />
         </div>

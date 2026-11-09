@@ -230,7 +230,7 @@ export function RecipesView({
               description="Save the meals you like to make, with a link and the ingredients you need."
             />
           ) : (
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {filtered.map((recipe) => {
                 const href = safeHref(recipe.source_url);
                 const readiness = recipeReadiness(recipe, pantry);

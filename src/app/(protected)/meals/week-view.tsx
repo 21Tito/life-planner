@@ -92,7 +92,7 @@ export function WeekView({
       />
 
       {/* Day grid */}
-      <div className="grid gap-3 lg:grid-cols-4 xl:grid-cols-7">
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-4 xl:grid-cols-7">
         {days.map((day) => {
           const date = toDateStr(day);
           const isToday = date === todayStr;
@@ -272,7 +272,7 @@ function Suggestions({
             : "Star the key ingredients in your recipes, and meals you can make with what you have will show up here."}
         </p>
       ) : (
-        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
           {shown.map((s) => (
             <div
               key={s.recipe.id}
