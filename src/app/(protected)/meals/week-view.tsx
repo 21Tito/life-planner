@@ -140,7 +140,7 @@ export function WeekView({
               key={date}
               id={`day-${date}`}
               size="sm"
-              className={cn("gap-2 scroll-mt-20", isToday && "ring-2 ring-green-500 bg-green-50/60")}
+              className={cn("gap-2 scroll-mt-[calc(4.5rem_+_env(safe-area-inset-top)_+_var(--page-tabs-h,0px))]", isToday && "ring-2 ring-green-500 bg-green-50/60")}
             >
               <CardContent className="space-y-2">
                 <div className="flex items-center justify-between gap-2 lg:flex-col lg:items-start lg:gap-0.5">

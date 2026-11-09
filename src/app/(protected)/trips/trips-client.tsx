@@ -12,18 +12,31 @@ import { Badge } from "@/components/ui/badge";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { StickyTabs } from "@/components/ui/sticky-tabs";
 import { Icons } from "@/components/ui/icons";
+
+type TripsTab = "upcoming" | "completed";
 
 interface Props {
   initialTrips: Trip[];
+  initialTab: TripsTab;
 }
 
 type CreationMode = "manual" | "csv";
 
-export function TripsClient({ initialTrips }: Props) {
+export function TripsClient({ initialTrips, initialTab }: Props) {
   const supabase = createClient();
   const router = useRouter();
   const [trips, setTrips] = useState<Trip[]>(initialTrips);
+  const [tab, setTab] = useState<TripsTab>(initialTab);
+
+  function switchTab(next: TripsTab) {
+    setTab(next);
+    const url = new URL(window.location.href);
+    if (next === "upcoming") url.searchParams.delete("tab");
+    else url.searchParams.set("tab", next);
+    window.history.replaceState(null, "", url);
+  }
   const [showForm, setShowForm] = useState(false);
   const [mode, setMode] = useState<CreationMode>("manual");
   const [submitting, setSubmitting] = useState(false);
@@ -204,19 +217,25 @@ export function TripsClient({ initialTrips }: Props) {
 
   return (
     <div className="max-w-4xl">
-      {/* Header */}
-      <div className="flex items-start justify-between mb-6 lg:mb-8 gap-4">
-        <div>
-          <h1
-            className="text-2xl lg:text-3xl font-bold mb-1"
-            style={{ fontFamily: "var(--font-display)" }}
-          >
-            Trip Planner
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Plan your next adventure with a day-by-day itinerary.
-          </p>
-        </div>
+      <h1 className="sr-only">Trips</h1>
+      <StickyTabs
+        label="Trip sections"
+        value={tab}
+        onChange={switchTab}
+        tabs={[
+          { value: "upcoming", label: `Upcoming${upcoming.length ? ` · ${upcoming.length}` : ""}` },
+          { value: "completed", label: `Completed${completed.length ? ` · ${completed.length}` : ""}` },
+        ]}
+      />
+
+      {tab === "upcoming" && (
+      <>
+      <div className="flex items-center justify-between gap-4 mb-4 lg:mb-6">
+        <p className="text-sm text-muted-foreground">
+          {upcoming.length === 0
+            ? "Nothing planned yet."
+            : `${upcoming.length} upcoming trip${upcoming.length === 1 ? "" : "s"}`}
+        </p>
         <Button
           onClick={() => {
             setShowForm(!showForm);
@@ -445,73 +464,66 @@ export function TripsClient({ initialTrips }: Props) {
         </Card>
       )}
 
-      {/* Upcoming trips */}
-      {trips.length === 0 && !showForm ? (
-        <EmptyState
-          icon={Icons.map}
-          title="No trips planned yet"
-          description='Hit "New Trip" to start planning your adventure.'
-        />
-      ) : upcoming.length === 0 && !showForm ? (
+      {upcoming.length === 0 && !showForm ? (
         <EmptyState
           icon={Icons.map}
           title="No upcoming trips"
-          description="Finished trips are saved below in Completed trips."
-          className="py-10"
+          description={
+            completed.length > 0
+              ? 'Past trips are in the Completed tab. Hit "New Trip" to plan the next one.'
+              : 'Hit "New Trip" to start planning your adventure.'
+          }
         />
-      ) : upcoming.length > 0 ? (
-        <div>
-          {completed.length > 0 && (
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3 lg:mb-4">
-              Upcoming trips
-            </h2>
-          )}
-          <div className="space-y-3">
-            {upcoming.map((trip) => (
-              <TripRow
-                key={trip.id}
-                trip={trip}
-                formatDate={formatDate}
-                tripDuration={tripDuration}
-                onEdit={() => openEditModal(trip)}
-                onDelete={() => setDeletingTrip(trip)}
-              />
-            ))}
-          </div>
+      ) : (
+        <div className="space-y-3">
+          {upcoming.map((trip) => (
+            <TripRow
+              key={trip.id}
+              trip={trip}
+              formatDate={formatDate}
+              tripDuration={tripDuration}
+              onEdit={() => openEditModal(trip)}
+              onDelete={() => setDeletingTrip(trip)}
+            />
+          ))}
         </div>
-      ) : null}
+      )}
+      </>
+      )}
 
-      {/* Completed trips — kept for later, hidden from Home after 7 days */}
-      {completed.length > 0 && (
-        <div className={upcoming.length > 0 || showForm ? "mt-10" : "mt-2"}>
-          <div className="mb-3 lg:mb-4">
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Completed trips
-            </h2>
-            <p className="text-xs text-muted-foreground mt-1">
-              These itineraries stay saved so you can look back anytime.
+      {tab === "completed" && (
+        completed.length === 0 ? (
+          <EmptyState
+            icon={Icons.map}
+            title="No completed trips yet"
+            description="Trips move here a week after they end, and stay saved so you can look back anytime."
+          />
+        ) : (
+          <>
+            <p className="text-sm text-muted-foreground mb-4 lg:mb-6">
+              Past itineraries stay saved so you can look back anytime.
             </p>
-          </div>
-          <div className="space-y-3">
-            {completed.map((trip) => (
-              <TripRow
-                key={trip.id}
-                trip={trip}
-                completed
-                formatDate={formatDate}
-                tripDuration={tripDuration}
-                onEdit={() => openEditModal(trip)}
-                onDelete={() => setDeletingTrip(trip)}
-              />
-            ))}
-          </div>
-        </div>
+            <div className="space-y-3">
+              {completed.map((trip) => (
+                <TripRow
+                  key={trip.id}
+                  trip={trip}
+                  completed
+                  formatDate={formatDate}
+                  tripDuration={tripDuration}
+                  onEdit={() => openEditModal(trip)}
+                  onDelete={() => setDeletingTrip(trip)}
+                />
+              ))}
+            </div>
+          </>
+        )
       )}
 
       {/* Edit modal */}
       {editingTrip && (
         <div
-          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4"
+          className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center sm:p-4"
           style={{ backgroundColor: "rgba(0,0,0,0.45)" }}
           onClick={(e) => e.target === e.currentTarget && setEditingTrip(null)}
         >
@@ -576,7 +588,7 @@ export function TripsClient({ initialTrips }: Props) {
       {/* Delete confirmation modal */}
       {deletingTrip && (
         <div
-          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4"
+          className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center sm:p-4"
           style={{ backgroundColor: "rgba(0,0,0,0.45)" }}
           onClick={(e) => e.target === e.currentTarget && setDeletingTrip(null)}
         >

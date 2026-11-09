@@ -13,7 +13,7 @@ import {
   startOfWeek,
   toDateStr,
 } from "@/lib/meals";
-import { cn } from "@/lib/utils";
+import { StickyTabs } from "@/components/ui/sticky-tabs";
 import { WeekView } from "./week-view";
 import { RecipesView } from "./recipes-view";
 import { KitchenView } from "./kitchen-view";
@@ -125,42 +125,17 @@ export function MealsClient({
   const needsReview =
     now !== null && pantry.length > 0 && (reviewAge === null || reviewAge >= PANTRY_REVIEW_INTERVAL_DAYS);
 
+  const toBuyCount = shoppingItems.filter((i) => !i.checked).length;
+
   return (
     <div className="max-w-5xl">
-      <div className="mb-5 lg:mb-6">
-        <h1
-          className="text-2xl lg:text-3xl font-bold mb-1"
-          style={{ fontFamily: "var(--font-display)" }}
-        >
-          Meal Planner
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Plan the week&apos;s meals around what&apos;s already in your kitchen.
-        </p>
-      </div>
-
-      <div className="flex rounded-xl border border-[var(--color-border)] overflow-hidden mb-5 lg:mb-6 text-sm w-fit">
-        {TAB_LABELS.map(({ value, label }, i) => (
-          <button
-            key={value}
-            onClick={() => switchTab(value)}
-            className={cn(
-              "px-4 py-2 transition-colors",
-              i > 0 && "border-l border-[var(--color-border)]",
-              tab === value
-                ? "bg-[var(--color-brand-600)] text-white font-medium"
-                : "text-[var(--color-text-muted)] hover:bg-gray-50"
-            )}
-          >
-            {label}
-            {value === "shopping" && shoppingItems.some((i) => !i.checked) && (
-              <span className="ml-1.5 tabular-nums opacity-80">
-                {shoppingItems.filter((i) => !i.checked).length}
-              </span>
-            )}
-          </button>
-        ))}
-      </div>
+      <h1 className="sr-only">Meal Planner</h1>
+      <StickyTabs
+        label="Meal planner sections"
+        value={tab}
+        onChange={switchTab}
+        tabs={TAB_LABELS.map((t) => ({ ...t, badge: t.value === "shopping" ? toBuyCount : undefined }))}
+      />
 
       {needsReview && tab !== "kitchen" && (
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm">
