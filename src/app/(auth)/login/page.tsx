@@ -44,7 +44,7 @@ function LoginForm() {
         <p className="text-center text-[var(--color-text-muted)] mb-8">
           {needsConsent
             ? "Allow Google Calendar access once so trips can sync to your calendar."
-            : "Sign in to access your planner"}
+            : "Sign in to plan your meals and trips"}
         </p>
 
         <button

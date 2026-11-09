@@ -9,14 +9,16 @@ import { signInWithGoogle as startGoogleSignIn } from "@/lib/google-sign-in";
 
 const FEATURES = [
   {
-    icon: Icons.map,
-    title: "Trip Itineraries",
-    description: "Day-by-day plans tailored to your interests and budget.",
+    icon: Icons.utensils,
+    title: "Meal Planning",
+    description:
+      "Plan the week's lunches and dinners, see what you can cook from your kitchen, and build the shopping list as you go.",
   },
   {
-    icon: Icons.sparkle,
-    title: "Powered by AI",
-    description: "Claude generates smart, personalized suggestions every time.",
+    icon: Icons.map,
+    title: "Trips",
+    description:
+      "Keep every trip's itinerary, hotels, and dates in one place, synced to Google Calendar with a countdown to the next one.",
   },
 ];
 
@@ -65,8 +67,8 @@ export default function HomePage() {
       {/* Hero */}
       <div className="flex-1 flex flex-col items-center justify-center px-4 lg:px-6 py-16 lg:py-20 text-center">
         <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-secondary text-primary text-xs font-semibold mb-5 lg:mb-6">
-          <span className="text-primary/70">{Icons.sparkle}</span>
-          AI-powered planning
+          <span className="text-primary/70">{Icons.utensils}</span>
+          Meals and trips, in one place
         </div>
 
         <h1
@@ -77,7 +79,7 @@ export default function HomePage() {
         </h1>
 
         <p className="max-w-sm lg:max-w-xl text-base lg:text-lg leading-7 lg:leading-8 text-muted-foreground mb-8 lg:mb-10">
-          AI-powered trip itineraries that actually make sense.
+          Know what's for dinner tonight and when you're leaving next. Plan your meals and trips together, shared with your household.
         </p>
 
         <Button
