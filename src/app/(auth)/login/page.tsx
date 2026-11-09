@@ -10,7 +10,7 @@ function LoginForm() {
   const [loading, setLoading] = useState(false);
   const supabase = createClient();
   const searchParams = useSearchParams();
-  const redirectTo = searchParams.get("redirect") ?? "/trips";
+  const redirectTo = searchParams.get("redirect") ?? "/dashboard";
   // Set by the auth callback when Calendar access needs to be granted once more
   const needsConsent = searchParams.get("consent") === "1";
 

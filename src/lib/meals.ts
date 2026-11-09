@@ -6,7 +6,7 @@ import type {
   RecipeWithIngredients,
 } from "@/types";
 
-export const PLANNED_WEEKDAYS = 5; // Monday–Friday
+export const PLANNED_DAYS = 7; // Sunday–Saturday
 export const PANTRY_REVIEW_INTERVAL_DAYS = 7;
 
 // ── Dates (local time, so the week matches the viewer's calendar) ────────────
@@ -22,19 +22,14 @@ export function addDays(d: Date, n: number): Date {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
 }
 
+/** Weeks start on Sunday. */
 export function startOfWeek(d: Date): Date {
-  const daysSinceMonday = (d.getDay() + 6) % 7;
-  return addDays(d, -daysSinceMonday);
+  return addDays(d, -d.getDay());
 }
 
-/** The week to plan: this week on weekdays, next week on Saturday and Sunday. */
-export function planningWeekStart(d: Date): Date {
-  const day = d.getDay();
-  return startOfWeek(addDays(d, day === 6 ? 2 : day === 0 ? 1 : 0));
-}
-
-export function weekDates(weekStart: Date): Date[] {
-  return Array.from({ length: PLANNED_WEEKDAYS }, (_, i) => addDays(weekStart, i));
+/** `count` consecutive days starting at `start` (local midnight). */
+export function dayRange(start: Date, count: number): Date[] {
+  return Array.from({ length: count }, (_, i) => addDays(start, i));
 }
 
 export function daysSince(iso: string, now = new Date()): number {

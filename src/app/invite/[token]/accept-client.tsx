@@ -29,7 +29,7 @@ export function AcceptInviteClient({
         setError(data.error ?? "Something went wrong");
         return;
       }
-      router.push("/trips");
+      router.push("/dashboard");
       router.refresh();
     } finally {
       setAccepting(false);

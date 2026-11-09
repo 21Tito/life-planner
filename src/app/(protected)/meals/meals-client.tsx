@@ -6,11 +6,10 @@ import { useOwnerId } from "@/lib/household-context";
 import type { MealPlanEntry, MealSlot, PantryItem, RecipeWithIngredients, ShoppingItem } from "@/types";
 import {
   PANTRY_REVIEW_INTERVAL_DAYS,
-  PLANNED_WEEKDAYS,
+  PLANNED_DAYS,
   addDays,
   daysSince,
-  planningWeekStart,
-  startOfWeek,
+  dayRange,
   toDateStr,
 } from "@/lib/meals";
 import { StickyTabs } from "@/components/ui/sticky-tabs";
@@ -18,6 +17,8 @@ import { WeekView } from "./week-view";
 import { RecipesView } from "./recipes-view";
 import { KitchenView } from "./kitchen-view";
 import { ShoppingView } from "./shopping-view";
+
+const MAX_DAYS_SHOWN = 35;
 
 export type MealsTab = "week" | "recipes" | "kitchen" | "shopping";
 export type OpenRecipe = { id: string; entryId?: string } | null;
@@ -38,6 +39,8 @@ interface Props {
   initialEntries: MealPlanEntry[];
   initialEntriesRange: { from: string; to: string };
   initialShopping: ShoppingItem[];
+  /** Opens a recipe on arrival, e.g. from the Home page */
+  initialOpenRecipe?: OpenRecipe;
 }
 
 function sortIngredients(recipes: RecipeWithIngredients[]): RecipeWithIngredients[] {
@@ -55,6 +58,7 @@ export function MealsClient({
   initialEntries,
   initialEntriesRange,
   initialShopping,
+  initialOpenRecipe = null,
 }: Props) {
   const supabase = createClient();
   const ownerId = useOwnerId();
@@ -65,53 +69,56 @@ export function MealsClient({
   const [recipes, setRecipes] = useState<RecipeWithIngredients[]>(() => sortIngredients(initialRecipes));
   const [entries, setEntries] = useState<MealPlanEntry[]>(initialEntries);
   const [shoppingItems, setShoppingItems] = useState<ShoppingItem[]>(initialShopping);
-  const [openRecipe, setOpenRecipe] = useState<OpenRecipe>(null);
+  const [openRecipe, setOpenRecipe] = useState<OpenRecipe>(initialOpenRecipe);
   const [editingSlot, setEditingSlot] = useState<EditingSlot>(null);
 
   // Dates depend on the viewer's timezone, so they're only computed after mount
   const [now, setNow] = useState<Date | null>(null);
-  const [weekStart, setWeekStart] = useState<Date | null>(null);
-  const [loadingWeek, setLoadingWeek] = useState<string | null>(null);
-  const loadedWeeks = useRef(new Set<string>());
+  // This Week is a rolling window from today; "Show more" extends it a week at a time
+  const [dayCount, setDayCount] = useState(PLANNED_DAYS);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const loadedThrough = useRef(initialEntriesRange.to);
 
   useEffect(() => {
     const today = new Date();
-    const thisWeek = startOfWeek(today);
-    for (const offset of [-7, 0, 7]) {
-      const start = addDays(thisWeek, offset);
-      const end = addDays(start, PLANNED_WEEKDAYS - 1);
-      if (toDateStr(start) >= initialEntriesRange.from && toDateStr(end) <= initialEntriesRange.to) {
-        loadedWeeks.current.add(toDateStr(start));
-      }
+    setNow(new Date(today.getFullYear(), today.getMonth(), today.getDate()));
+
+    // A deep-linked recipe opens once; drop the params so a reload doesn't reopen it
+    const url = new URL(window.location.href);
+    if (url.searchParams.has("recipe")) {
+      url.searchParams.delete("recipe");
+      url.searchParams.delete("entry");
+      window.history.replaceState(null, "", url);
     }
-    setNow(today);
-    setWeekStart(planningWeekStart(today));
-  }, [initialEntriesRange.from, initialEntriesRange.to]);
+  }, []);
 
-  const goToWeek = useCallback(
-    async (start: Date) => {
-      setWeekStart(start);
-      const key = toDateStr(start);
-      if (loadedWeeks.current.has(key)) return;
+  const days = now ? dayRange(now, dayCount) : null;
 
-      setLoadingWeek(key);
-      const { data, error } = await supabase
-        .from("meal_plan_entries")
-        .select("*")
-        .eq("user_id", ownerId)
-        .gte("date", key)
-        .lte("date", toDateStr(addDays(start, PLANNED_WEEKDAYS - 1)));
-      if (!error && data) {
-        loadedWeeks.current.add(key);
-        setEntries((prev) => {
-          const ids = new Set(data.map((e) => e.id));
-          return [...prev.filter((e) => !ids.has(e.id)), ...(data as MealPlanEntry[])];
-        });
-      }
-      setLoadingWeek((current) => (current === key ? null : current));
-    },
-    [supabase, ownerId]
-  );
+  const showMoreDays = useCallback(async () => {
+    if (!now) return;
+    const nextCount = Math.min(dayCount + PLANNED_DAYS, MAX_DAYS_SHOWN);
+    setDayCount(nextCount);
+    const end = toDateStr(addDays(now, nextCount - 1));
+    if (end <= loadedThrough.current) return;
+
+    // Only fetch the dates that haven't been loaded yet
+    const from = toDateStr(addDays(new Date(`${loadedThrough.current}T00:00:00`), 1));
+    setLoadingMore(true);
+    const { data, error } = await supabase
+      .from("meal_plan_entries")
+      .select("*")
+      .eq("user_id", ownerId)
+      .gte("date", from)
+      .lte("date", end);
+    if (!error && data) {
+      loadedThrough.current = end;
+      setEntries((prev) => {
+        const ids = new Set(data.map((e) => e.id));
+        return [...prev.filter((e) => !ids.has(e.id)), ...(data as MealPlanEntry[])];
+      });
+    }
+    setLoadingMore(false);
+  }, [now, dayCount, supabase, ownerId]);
 
   function switchTab(next: MealsTab) {
     setTab(next);
@@ -157,9 +164,11 @@ export function MealsClient({
       {tab === "week" && (
         <WeekView
           now={now}
-          weekStart={weekStart}
-          loading={weekStart !== null && loadingWeek === toDateStr(weekStart)}
-          onWeekChange={goToWeek}
+          days={days}
+          loadingMore={loadingMore}
+          canShowMore={dayCount < MAX_DAYS_SHOWN}
+          onShowMore={showMoreDays}
+          onShowFewer={dayCount > PLANNED_DAYS ? () => setDayCount(PLANNED_DAYS) : undefined}
           entries={entries}
           setEntries={setEntries}
           recipes={recipes}
@@ -185,7 +194,7 @@ export function MealsClient({
           items={shoppingItems}
           setItems={setShoppingItems}
           setPantry={setPantry}
-          weekStart={weekStart}
+          days={days}
           entries={entries}
           recipes={recipes}
           pantry={pantry}

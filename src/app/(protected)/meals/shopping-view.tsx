@@ -6,9 +6,7 @@ import { useOwnerId } from "@/lib/household-context";
 import type { MealPlanEntry, PantryCategory, PantryItem, RecipeWithIngredients, ShoppingItem } from "@/types";
 import {
   PANTRY_CATEGORIES,
-  PLANNED_WEEKDAYS,
   STORE_CATEGORY_ORDER,
-  addDays,
   buildShoppingList,
   guessCategory,
   isOnList,
@@ -25,7 +23,8 @@ interface Props {
   items: ShoppingItem[];
   setItems: React.Dispatch<React.SetStateAction<ShoppingItem[]>>;
   setPantry: React.Dispatch<React.SetStateAction<PantryItem[]>>;
-  weekStart: Date | null;
+  /** The days shown on This Week; suggestions cover the same range */
+  days: Date[] | null;
   entries: MealPlanEntry[];
   recipes: RecipeWithIngredients[];
   pantry: PantryItem[];
@@ -46,7 +45,7 @@ function groupForStore(items: ShoppingItem[]) {
   }));
 }
 
-export function ShoppingView({ items, setItems, setPantry, weekStart, entries, recipes, pantry }: Props) {
+export function ShoppingView({ items, setItems, setPantry, days, entries, recipes, pantry }: Props) {
   const supabase = createClient();
   const ownerId = useOwnerId();
 
@@ -167,17 +166,15 @@ export function ShoppingView({ items, setItems, setPantry, weekStart, entries, r
     };
   }, [shopping]);
 
-  // Ingredients this week's recipes need that aren't in the kitchen or already on the list
+  // Ingredients upcoming meals need that aren't in the kitchen or already on the list
   let suggestions: ReturnType<typeof buildShoppingList> = [];
-  let weekLabel = "";
-  if (weekStart) {
-    const from = toDateStr(weekStart);
-    const to = toDateStr(addDays(weekStart, PLANNED_WEEKDAYS - 1));
-    const weekEntries = entries.filter((e) => e.date >= from && e.date <= to);
-    suggestions = buildShoppingList(weekEntries, recipes, pantry).filter(
+  if (days && days.length > 0) {
+    const from = toDateStr(days[0]);
+    const to = toDateStr(days[days.length - 1]);
+    const upcoming = entries.filter((e) => e.date >= from && e.date <= to);
+    suggestions = buildShoppingList(upcoming, recipes, pantry).filter(
       (l) => !l.match && !isOnList(l.name, items)
     );
-    weekLabel = weekStart.toLocaleDateString("en-US", { month: "short", day: "numeric" });
   }
   const suggestionRow = (l: (typeof suggestions)[number]) => ({
     name: l.name,
@@ -322,7 +319,7 @@ export function ShoppingView({ items, setItems, setPantry, weekStart, entries, r
         <section className="mt-8">
           <div className="flex items-center justify-between gap-3 mb-2">
             <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Needed for the week of {weekLabel}
+              Needed for the next {days?.length ?? 7} days
             </h2>
             <Button
               variant="outline"

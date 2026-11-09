@@ -20,11 +20,13 @@ type TripsTab = "upcoming" | "completed";
 interface Props {
   initialTrips: Trip[];
   initialTab: TripsTab;
+  /** Opens the New Trip form on arrival, e.g. from the Home page */
+  startWithNewTrip?: boolean;
 }
 
 type CreationMode = "manual" | "csv";
 
-export function TripsClient({ initialTrips, initialTab }: Props) {
+export function TripsClient({ initialTrips, initialTab, startWithNewTrip = false }: Props) {
   const supabase = createClient();
   const router = useRouter();
   const [trips, setTrips] = useState<Trip[]>(initialTrips);
@@ -37,7 +39,7 @@ export function TripsClient({ initialTrips, initialTab }: Props) {
     else url.searchParams.set("tab", next);
     window.history.replaceState(null, "", url);
   }
-  const [showForm, setShowForm] = useState(false);
+  const [showForm, setShowForm] = useState(startWithNewTrip);
   const [mode, setMode] = useState<CreationMode>("manual");
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);

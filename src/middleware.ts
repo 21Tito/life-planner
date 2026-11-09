@@ -32,6 +32,7 @@ export async function middleware(request: NextRequest) {
 
   // Redirect unauthenticated users away from protected routes
   const isProtectedRoute =
+    request.nextUrl.pathname.startsWith("/dashboard") ||
     request.nextUrl.pathname.startsWith("/trips") ||
     request.nextUrl.pathname.startsWith("/meals") ||
     request.nextUrl.pathname.startsWith("/settings");
@@ -46,7 +47,7 @@ export async function middleware(request: NextRequest) {
   // ...except for the one-time Calendar consent step, which runs while signed in
   if (user && request.nextUrl.pathname === "/login" && request.nextUrl.searchParams.get("consent") !== "1") {
     const url = request.nextUrl.clone();
-    url.pathname = "/trips";
+    url.pathname = "/dashboard";
     return NextResponse.redirect(url);
   }
 

@@ -2,7 +2,7 @@
   "name": "Life Planner",
   "short_name": "Life Planner",
   "description": "Plan your life, trips, and meals",
-  "start_url": "/trips",
+  "start_url": "/dashboard",
   "display": "standalone",
   "background_color": "#0a0a0a",
   "theme_color": "#0a0a0a",

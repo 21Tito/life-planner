@@ -7,8 +7,9 @@ import { cn } from "@/lib/utils";
 import { usePendingNav } from "./use-pending-nav";
 
 const navItems = [
-  { href: "/trips", label: "Trips", icon: Icons.map },
+  { href: "/dashboard", label: "Home", icon: Icons.home },
   { href: "/meals", label: "Meals", icon: Icons.utensils },
+  { href: "/trips", label: "Trips", icon: Icons.map },
 ];
 
 // Matches the pill's p-1.5 inset, used to size and place the sliding highlight
@@ -31,7 +32,7 @@ export function MobileNav() {
     >
       <div
         className="pointer-events-auto relative grid p-1.5 rounded-full bg-white/75 backdrop-blur-xl backdrop-saturate-150 ring-1 ring-black/5 shadow-[0_10px_30px_-6px_rgba(0,0,0,0.25)]"
-        style={{ gridTemplateColumns: `repeat(${count}, minmax(0, 1fr))`, width: "min(17rem, calc(100vw - 2.5rem))" }}
+        style={{ gridTemplateColumns: `repeat(${count}, minmax(0, 1fr))`, width: "min(21rem, calc(100vw - 2.5rem))" }}
       >
         {/* Highlight that slides to the active tab */}
         <span

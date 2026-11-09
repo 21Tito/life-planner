@@ -27,7 +27,7 @@ export default function HomePage() {
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) router.push("/trips");
+      if (user) router.push("/dashboard");
     });
   }, []);
 

@@ -1,19 +1,16 @@
 "use client";
 
 import { createClient } from "@/lib/supabase/client";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { useOwnerId } from "@/lib/household-context";
 import type { MealPlanEntry, MealSlot, PantryItem, RecipeWithIngredients, ShoppingItem } from "@/types";
 import {
-  PLANNED_WEEKDAYS,
   addDays,
   buildShoppingList,
   isOnList,
-  planningWeekStart,
   recipeReadiness,
   suggestRecipes,
   toDateStr,
-  weekDates,
 } from "@/lib/meals";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,9 +23,12 @@ import type { EditingSlot, MealsTab } from "./meals-client";
 
 interface Props {
   now: Date | null;
-  weekStart: Date | null;
-  loading: boolean;
-  onWeekChange: (start: Date) => void;
+  /** Consecutive days to show, starting today */
+  days: Date[] | null;
+  loadingMore: boolean;
+  canShowMore: boolean;
+  onShowMore: () => void;
+  onShowFewer?: () => void;
   entries: MealPlanEntry[];
   setEntries: React.Dispatch<React.SetStateAction<MealPlanEntry[]>>;
   recipes: RecipeWithIngredients[];
@@ -48,9 +48,11 @@ function formatShort(d: Date) {
 
 export function WeekView({
   now,
-  weekStart,
-  loading,
-  onWeekChange,
+  days,
+  loadingMore,
+  canShowMore,
+  onShowMore,
+  onShowFewer,
   entries,
   setEntries,
   recipes,
@@ -63,28 +65,16 @@ export function WeekView({
 }: Props) {
   const recipesById = useMemo(() => new Map(recipes.map((r) => [r.id, r])), [recipes]);
 
-  // On phones the days stack vertically, so bring today into view once on arrival
-  const scrolledToToday = useRef(false);
-  useEffect(() => {
-    if (!now || !weekStart || scrolledToToday.current) return;
-    scrolledToToday.current = true;
-    if (!window.matchMedia("(max-width: 1023px)").matches) return;
-    document.getElementById(`day-${toDateStr(now)}`)?.scrollIntoView({ block: "start", behavior: "smooth" });
-  }, [now, weekStart]);
-
-  if (!weekStart || !now) {
+  if (!days || !now) {
     return <div className="h-64 rounded-xl bg-muted/50 animate-pulse" />;
   }
 
-  const days = weekDates(weekStart);
   const from = toDateStr(days[0]);
   const to = toDateStr(days[days.length - 1]);
   const weekEntries = entries.filter((e) => e.date >= from && e.date <= to);
   const entryFor = (date: string, slot: MealSlot) =>
     weekEntries.find((e) => e.date === date && e.slot === slot);
   const todayStr = toDateStr(now);
-  const currentWeek = planningWeekStart(now);
-  const isCurrentWeek = toDateStr(weekStart) === toDateStr(currentWeek);
 
   const editingEntry = editingSlot ? entryFor(editingSlot.date, editingSlot.slot) : undefined;
   const plannedIds = new Set(weekEntries.flatMap((e) => (e.recipe_id ? [e.recipe_id] : [])));
@@ -92,35 +82,6 @@ export function WeekView({
 
   return (
     <div>
-      {/* Week navigation */}
-      <div className="flex flex-wrap items-center gap-2 mb-4">
-        <Button
-          variant="outline"
-          size="icon"
-          aria-label="Previous week"
-          onClick={() => onWeekChange(addDays(weekStart, -7))}
-        >
-          ‹
-        </Button>
-        <h2 className="font-semibold text-base min-w-[9.5rem] text-center">
-          {formatShort(days[0])} – {formatShort(days[PLANNED_WEEKDAYS - 1])}
-        </h2>
-        <Button
-          variant="outline"
-          size="icon"
-          aria-label="Next week"
-          onClick={() => onWeekChange(addDays(weekStart, 7))}
-        >
-          ›
-        </Button>
-        {!isCurrentWeek && (
-          <Button variant="ghost" size="sm" onClick={() => onWeekChange(currentWeek)}>
-            This week
-          </Button>
-        )}
-        {loading && <span className="text-xs text-muted-foreground">Loading…</span>}
-      </div>
-
       <Suggestions
         recipes={recipes}
         pantry={pantry}
@@ -131,7 +92,7 @@ export function WeekView({
       />
 
       {/* Day grid */}
-      <div className={cn("grid gap-3 lg:grid-cols-5", loading && "opacity-60")}>
+      <div className="grid gap-3 lg:grid-cols-4 xl:grid-cols-7">
         {days.map((day) => {
           const date = toDateStr(day);
           const isToday = date === todayStr;
@@ -189,6 +150,22 @@ export function WeekView({
             </Card>
           );
         })}
+      </div>
+
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        {canShowMore && (
+          <Button variant="outline" onClick={onShowMore} disabled={loadingMore}>
+            {loadingMore ? "Loading…" : "Show 7 more days"}
+          </Button>
+        )}
+        {onShowFewer && (
+          <Button variant="ghost" onClick={onShowFewer}>
+            Show fewer
+          </Button>
+        )}
+        <span className="text-xs text-muted-foreground ml-auto">
+          {formatShort(days[0])} – {formatShort(days[days.length - 1])}
+        </span>
       </div>
 
       <ShoppingSummary
@@ -546,8 +523,8 @@ function ShoppingSummary({
         </p>
         <p className="text-muted-foreground text-xs mt-0.5">
           {stillNeeded > 0
-            ? `${stillNeeded} ingredient${stillNeeded === 1 ? "" : "s"} for this week's recipes aren't in your kitchen or on the list yet.`
-            : "Everything this week's recipes need is in your kitchen or on the list."}
+            ? `${stillNeeded} ingredient${stillNeeded === 1 ? "" : "s"} for upcoming meals aren't in your kitchen or on the list yet.`
+            : "Everything your upcoming meals need is in your kitchen or on the list."}
         </p>
       </div>
       <Button variant="outline" size="sm" onClick={() => onGoToTab("shopping")}>

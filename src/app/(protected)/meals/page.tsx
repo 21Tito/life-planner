@@ -4,14 +4,15 @@ import type { MealPlanEntry, PantryItem, RecipeWithIngredients, ShoppingItem } f
 import { MealsClient, type MealsTab } from "./meals-client";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const TABS: MealsTab[] = ["week", "recipes", "kitchen", "shopping"];
 
 export default async function MealsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string }>;
+  searchParams: Promise<{ tab?: string; recipe?: string; entry?: string }>;
 }) {
-  const { tab: requestedTab } = await searchParams;
+  const { tab: requestedTab, recipe, entry } = await searchParams;
   // The Kitchen tab used to be called Fridge; keep old links working
   const tab = requestedTab === "fridge" ? "kitchen" : requestedTab;
   const supabase = await createClient();
@@ -44,6 +45,7 @@ export default async function MealsPage({
       initialEntries={(entries.data ?? []) as MealPlanEntry[]}
       initialEntriesRange={{ from: entriesFrom, to: entriesTo }}
       initialShopping={(shopping.data ?? []) as ShoppingItem[]}
+      initialOpenRecipe={recipe && UUID.test(recipe) ? { id: recipe, entryId: entry && UUID.test(entry) ? entry : undefined } : null}
     />
   );
 }

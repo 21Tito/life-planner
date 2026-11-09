@@ -9,7 +9,7 @@ const CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar.events";
  */
 export function signInWithGoogle(
   supabase: SupabaseClient,
-  { next = "/trips", forceConsent = false }: { next?: string; forceConsent?: boolean } = {}
+  { next = "/dashboard", forceConsent = false }: { next?: string; forceConsent?: boolean } = {}
 ) {
   const callback = new URL("/auth/callback", window.location.origin);
   callback.searchParams.set("next", next);

@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { MealPlanEntry, PantryItem, RecipeWithIngredients } from "@/types";
 import {
-  PLANNED_WEEKDAYS,
+  PLANNED_DAYS,
   addDays,
   findPantryMatch,
   formatExpiry,
@@ -208,7 +208,7 @@ const TOOLS: Tool[] = [
   {
     name: "get_meal_plan",
     title: "Get meal plan",
-    description: "Gets the Monday–Friday lunch and dinner plan for the week containing the given date.",
+    description: "Gets the Sunday–Saturday lunch and dinner plan for the week containing the given date.",
     inputSchema: {
       type: "object",
       properties: {
@@ -219,8 +219,8 @@ const TOOLS: Tool[] = [
     readOnly: true,
     async handler(args, ctx) {
       const weekOf = optionalString(args, "week_of", 10);
-      const monday = startOfWeek(weekOf ? calendarDate(weekOf, "week_of") : new Date());
-      const days = Array.from({ length: PLANNED_WEEKDAYS }, (_, i) => toDateStr(addDays(monday, i)));
+      const sunday = startOfWeek(weekOf ? calendarDate(weekOf, "week_of") : new Date());
+      const days = Array.from({ length: PLANNED_DAYS }, (_, i) => toDateStr(addDays(sunday, i)));
 
       const { data, error } = await ctx.admin
         .from("meal_plan_entries")
@@ -321,11 +321,11 @@ const TOOLS: Tool[] = [
     name: "plan_meal",
     title: "Plan a meal",
     description:
-      "Puts a saved recipe or a short note (like 'Leftovers') into a weekday lunch or dinner slot, replacing whatever was there. Only call this when the user asks to plan a meal.",
+      "Puts a saved recipe or a short note (like 'Leftovers') into a day's lunch or dinner slot, replacing whatever was there. Only call this when the user asks to plan a meal.",
     inputSchema: {
       type: "object",
       properties: {
-        date: { type: "string", description: "Weekday date, YYYY-MM-DD" },
+        date: { type: "string", description: "Date, YYYY-MM-DD" },
         slot: { type: "string", enum: ["dinner", "lunch"] },
         recipe_id: { type: "string", description: "Recipe id from list_recipes or save_recipe" },
         note: { type: "string", maxLength: 200, description: "Use instead of recipe_id for non-recipe meals" },
@@ -337,8 +337,7 @@ const TOOLS: Tool[] = [
     destructive: true,
     async handler(args, ctx) {
       const date = requiredString(args, "date", 10);
-      const day = calendarDate(date, "date").getDay();
-      if (day === 0 || day === 6) throw new ToolInputError("The planner only covers Monday through Friday.");
+      calendarDate(date, "date");
       const slot = args.slot;
       if (slot !== "dinner" && slot !== "lunch") throw new ToolInputError("slot must be 'dinner' or 'lunch'.");
 
