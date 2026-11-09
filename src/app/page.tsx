@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { Icons } from "@/components/ui/icons";
 import { Button } from "@/components/ui/button";
+import { signInWithGoogle as startGoogleSignIn } from "@/lib/google-sign-in";
 
 const FEATURES = [
   {
@@ -32,12 +33,7 @@ export default function HomePage() {
 
   async function signInWithGoogle() {
     setLoading(true);
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-      },
-    });
+    const { error } = await startGoogleSignIn(supabase);
     if (error) {
       console.error("Login error:", error);
       setLoading(false);

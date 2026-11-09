@@ -43,7 +43,8 @@ export async function middleware(request: NextRequest) {
   }
 
   // Redirect authenticated users away from login
-  if (user && request.nextUrl.pathname === "/login") {
+  // ...except for the one-time Calendar consent step, which runs while signed in
+  if (user && request.nextUrl.pathname === "/login" && request.nextUrl.searchParams.get("consent") !== "1") {
     const url = request.nextUrl.clone();
     url.pathname = "/trips";
     return NextResponse.redirect(url);

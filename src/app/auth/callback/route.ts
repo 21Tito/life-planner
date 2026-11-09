@@ -14,24 +14,42 @@ export async function GET(request: Request) {
     const { data, error } = await supabase.auth.exchangeCodeForSession(code);
 
     if (!error && data.session) {
-      // Capture Google provider tokens and store them
+      // Capture Google provider tokens for Calendar sync
       const providerToken = data.session.provider_token;
       const providerRefreshToken = data.session.provider_refresh_token;
+      const userId = data.session.user.id;
 
-      if (providerToken && providerRefreshToken) {
+      if (providerToken) {
         const adminSupabase = createServerClient(
           process.env.NEXT_PUBLIC_SUPABASE_URL!,
           process.env.SUPABASE_SERVICE_ROLE_KEY!,
           { cookies: { getAll: () => [], setAll: () => {} } }
         );
-
-        await adminSupabase.from("google_tokens").upsert({
-          user_id: data.session.user.id,
+        const access = {
           access_token: providerToken,
-          refresh_token: providerRefreshToken,
           expires_at: new Date(Date.now() + 3600 * 1000).toISOString(),
           updated_at: new Date().toISOString(),
-        });
+        };
+
+        if (providerRefreshToken) {
+          await adminSupabase
+            .from("google_tokens")
+            .upsert({ user_id: userId, refresh_token: providerRefreshToken, ...access });
+        } else {
+          // Google only issues a refresh token at consent; on later sign-ins keep the stored one
+          const { data: stored } = await adminSupabase
+            .from("google_tokens")
+            .update(access)
+            .eq("user_id", userId)
+            .select("user_id")
+            .maybeSingle();
+
+          // Nothing stored (new account, or access was revoked): ask for consent once.
+          // `consented` marks that we already did, so this can't loop.
+          if (!stored && searchParams.get("consented") !== "1") {
+            return NextResponse.redirect(`${origin}/login?consent=1&redirect=${encodeURIComponent(next)}`);
+          }
+        }
       }
 
       return NextResponse.redirect(`${origin}${next}`);

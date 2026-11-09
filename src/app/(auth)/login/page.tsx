@@ -1,35 +1,36 @@
 "use client";
 
 import { createClient } from "@/lib/supabase/client";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
+import { signInWithGoogle as startGoogleSignIn } from "@/lib/google-sign-in";
 
 function LoginForm() {
   const [loading, setLoading] = useState(false);
   const supabase = createClient();
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get("redirect") ?? "/trips";
+  // Set by the auth callback when Calendar access needs to be granted once more
+  const needsConsent = searchParams.get("consent") === "1";
 
   async function signInWithGoogle() {
     setLoading(true);
-    const callbackUrl = `${window.location.origin}/auth/callback?next=${encodeURIComponent(redirectTo)}`;
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: callbackUrl,
-        scopes: "https://www.googleapis.com/auth/calendar.events",
-        queryParams: {
-          access_type: "offline",
-          prompt: "consent",
-        },
-      },
-    });
+    const { error } = await startGoogleSignIn(supabase, { next: redirectTo, forceConsent: needsConsent });
     if (error) {
       console.error("Login error:", error);
       setLoading(false);
     }
   }
+
+  const autoStarted = useRef(false);
+  useEffect(() => {
+    if (needsConsent && !autoStarted.current) {
+      autoStarted.current = true;
+      signInWithGoogle();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [needsConsent]);
 
   return (
     <main className="flex min-h-screen items-center justify-center px-6">
@@ -38,10 +39,12 @@ function LoginForm() {
           className="text-3xl font-bold text-center mb-2"
           style={{ fontFamily: "var(--font-display)" }}
         >
-          Welcome back
+          {needsConsent ? "One more step" : "Welcome back"}
         </h1>
         <p className="text-center text-[var(--color-text-muted)] mb-8">
-          Sign in to access your planner
+          {needsConsent
+            ? "Allow Google Calendar access once so trips can sync to your calendar."
+            : "Sign in to access your planner"}
         </p>
 
         <button
