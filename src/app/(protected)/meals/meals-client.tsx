@@ -16,11 +16,11 @@ import { StickyTabs } from "@/components/ui/sticky-tabs";
 import { WeekView } from "./week-view";
 import { RecipesView } from "./recipes-view";
 import { KitchenView } from "./kitchen-view";
-import { ShoppingView } from "./shopping-view";
+import { useSyncShoppingCount } from "@/lib/shopping-count-context";
 
 const MAX_DAYS_SHOWN = 35;
 
-export type MealsTab = "week" | "recipes" | "kitchen" | "shopping";
+export type MealsTab = "week" | "recipes" | "kitchen";
 export type OpenRecipe = { id: string; entryId?: string } | null;
 export type EditingSlot = { date: string; slot: MealSlot } | null;
 
@@ -28,7 +28,6 @@ const TAB_LABELS: { value: MealsTab; label: string }[] = [
   { value: "week", label: "This Week" },
   { value: "recipes", label: "Recipes" },
   { value: "kitchen", label: "Kitchen" },
-  { value: "shopping", label: "Shopping" },
 ];
 
 interface Props {
@@ -68,7 +67,9 @@ export function MealsClient({
   const [reviewedAt, setReviewedAt] = useState<string | null>(initialReviewedAt);
   const [recipes, setRecipes] = useState<RecipeWithIngredients[]>(() => sortIngredients(initialRecipes));
   const [entries, setEntries] = useState<MealPlanEntry[]>(initialEntries);
+  // Week and recipes read the list, and Done cooking adds to it
   const [shoppingItems, setShoppingItems] = useState<ShoppingItem[]>(initialShopping);
+  useSyncShoppingCount(shoppingItems);
   const [openRecipe, setOpenRecipe] = useState<OpenRecipe>(initialOpenRecipe);
   const [editingSlot, setEditingSlot] = useState<EditingSlot>(null);
 
@@ -132,8 +133,6 @@ export function MealsClient({
   const needsReview =
     now !== null && pantry.length > 0 && (reviewAge === null || reviewAge >= PANTRY_REVIEW_INTERVAL_DAYS);
 
-  const toBuyCount = shoppingItems.filter((i) => !i.checked).length;
-
   return (
     <div className="max-w-5xl">
       <h1 className="sr-only">Meal Planner</h1>
@@ -141,7 +140,7 @@ export function MealsClient({
         label="Meal planner sections"
         value={tab}
         onChange={switchTab}
-        tabs={TAB_LABELS.map((t) => ({ ...t, badge: t.value === "shopping" ? toBuyCount : undefined }))}
+        tabs={TAB_LABELS}
       />
 
       {needsReview && tab !== "kitchen" && (
@@ -188,17 +187,6 @@ export function MealsClient({
           reviewAge={reviewAge}
           onReviewed={setReviewedAt}
           now={now}
-        />
-      )}
-      {tab === "shopping" && (
-        <ShoppingView
-          items={shoppingItems}
-          setItems={setShoppingItems}
-          setPantry={setPantry}
-          days={days}
-          entries={entries}
-          recipes={recipes}
-          pantry={pantry}
         />
       )}
       {/* Recipes view also hosts the recipe modals opened from the week grid */}

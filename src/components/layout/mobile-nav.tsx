@@ -5,10 +5,12 @@ import { usePathname } from "next/navigation";
 import { Icons } from "@/components/ui/icons";
 import { cn } from "@/lib/utils";
 import { usePendingNav } from "./use-pending-nav";
+import { useShoppingCount } from "@/lib/shopping-count-context";
 
 const navItems = [
   { href: "/dashboard", label: "Home", icon: Icons.home },
   { href: "/meals", label: "Meals", icon: Icons.utensils },
+  { href: "/shopping", label: "Shopping", icon: Icons.cart },
   { href: "/trips", label: "Trips", icon: Icons.map },
 ];
 
@@ -18,6 +20,7 @@ const INSET_REM = 0.375;
 export function MobileNav() {
   const pathname = usePathname();
   const nav = usePendingNav();
+  const toBuyCount = useShoppingCount();
 
   // Hide on trip detail pages — the back link is enough to navigate away
   if (/^\/trips\/.+/.test(pathname)) return null;
@@ -58,12 +61,26 @@ export function MobileNav() {
               onClick={() => nav.onNavigate(item.href)}
               aria-current={isActive ? "page" : undefined}
               className={cn(
-                "relative z-10 flex items-center justify-center gap-2 h-11 rounded-full text-sm font-medium",
+                // Icon above the label, so four items fit across a phone
+                "relative z-10 flex flex-col items-center justify-center gap-0.5 h-12 rounded-full text-[11px] leading-none font-medium",
                 "transition-[color,transform] duration-200 active:scale-95 touch-manipulation select-none",
                 isActive ? "text-white" : "text-[var(--color-text-muted)]"
               )}
             >
-              {item.icon}
+              <span className="relative">
+                {item.icon}
+                {item.href === "/shopping" && toBuyCount > 0 && (
+                  <span
+                    className={cn(
+                      "absolute -top-1.5 left-3 min-w-4 h-4 px-1 rounded-full text-[10px] leading-4 text-center font-semibold tabular-nums",
+                      isActive ? "bg-white text-[var(--color-brand-600)]" : "bg-[var(--color-brand-600)] text-white"
+                    )}
+                    aria-label={`${toBuyCount} to buy`}
+                  >
+                    {toBuyCount}
+                  </span>
+                )}
+              </span>
               {item.label}
             </Link>
           );

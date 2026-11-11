@@ -1,11 +1,12 @@
 import { createClient } from "@/lib/supabase/server";
 import { getVerifiedIds } from "@/lib/get-owner-id";
 import type { MealPlanEntry, PantryItem, RecipeWithIngredients, ShoppingItem } from "@/types";
+import { redirect } from "next/navigation";
 import { MealsClient, type MealsTab } from "./meals-client";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const TABS: MealsTab[] = ["week", "recipes", "kitchen", "shopping"];
+const TABS: MealsTab[] = ["week", "recipes", "kitchen"];
 
 export default async function MealsPage({
   searchParams,
@@ -13,6 +14,8 @@ export default async function MealsPage({
   searchParams: Promise<{ tab?: string; recipe?: string; entry?: string }>;
 }) {
   const { tab: requestedTab, recipe, entry } = await searchParams;
+  // Shopping used to be a Meals tab; it has its own page now
+  if (requestedTab === "shopping") redirect("/shopping");
   // The Kitchen tab used to be called Fridge; keep old links working
   const tab = requestedTab === "fridge" ? "kitchen" : requestedTab;
   const supabase = await createClient();

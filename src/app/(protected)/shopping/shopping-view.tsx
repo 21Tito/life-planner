@@ -19,7 +19,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Icons } from "@/components/ui/icons";
 import { CategoryHeading } from "@/components/ui/category-icon";
-import { ErrorText, FieldLabel, Modal, nativeSelectClass } from "./modal";
+import { ErrorText, FieldLabel, Modal, nativeSelectClass } from "../meals/modal";
 
 interface Props {
   items: ShoppingItem[];

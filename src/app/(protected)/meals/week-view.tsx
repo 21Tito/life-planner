@@ -15,7 +15,8 @@ import {
   suggestRecipes,
   toDateStr,
 } from "@/lib/meals";
-import { Button } from "@/components/ui/button";
+import Link from "next/link";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Icons } from "@/components/ui/icons";
@@ -183,7 +184,6 @@ export function WeekView({
         recipes={recipes}
         pantry={pantry}
         shoppingItems={shoppingItems}
-        onGoToTab={onGoToTab}
       />
 
       {editingSlot && (
@@ -607,13 +607,11 @@ function ShoppingSummary({
   recipes,
   pantry,
   shoppingItems,
-  onGoToTab,
 }: {
   weekEntries: MealPlanEntry[];
   recipes: RecipeWithIngredients[];
   pantry: PantryItem[];
   shoppingItems: ShoppingItem[];
-  onGoToTab: (tab: MealsTab) => void;
 }) {
   const onList = shoppingItems.filter((i) => !i.checked).length;
   const stillNeeded = buildShoppingList(weekEntries, recipes, pantry).filter(
@@ -632,9 +630,9 @@ function ShoppingSummary({
             : "Everything your upcoming meals need is in your kitchen or on the list."}
         </p>
       </div>
-      <Button variant="outline" size="sm" onClick={() => onGoToTab("shopping")}>
+      <Link href="/shopping" className={buttonVariants({ variant: "outline", size: "sm" })}>
         Open list
-      </Button>
+      </Link>
     </section>
   );
 }

@@ -19,6 +19,7 @@ import {
 } from "@/lib/meals";
 import { Icons } from "@/components/ui/icons";
 import { cn } from "@/lib/utils";
+import { useSyncShoppingCount } from "@/lib/shopping-count-context";
 
 interface Props {
   entries: MealPlanEntry[];
@@ -40,6 +41,7 @@ function localDate(dateStr: string) {
 }
 
 export function DashboardClient({ entries, recipes, pantry, shoppingCount, trips, reviewedAt }: Props) {
+  useSyncShoppingCount(shoppingCount);
   // "Today" depends on the viewer's timezone, so it's only known after mount
   const [now, setNow] = useState<Date | null>(null);
   useEffect(() => setNow(new Date()), []);
@@ -137,7 +139,7 @@ export function DashboardClient({ entries, recipes, pantry, shoppingCount, trips
         <div className="space-y-3 min-w-0">
           {shoppingCount > 0 && (
             <SideCard
-              href="/meals?tab=shopping"
+              href="/shopping"
               icon={Icons.check}
               title="Shopping list"
               detail={`${shoppingCount} item${shoppingCount === 1 ? "" : "s"} to buy`}

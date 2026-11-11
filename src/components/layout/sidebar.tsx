@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePendingNav } from "./use-pending-nav";
 import { Icons } from "@/components/ui/icons";
 import { UserMenu } from "@/components/layout/user-menu";
+import { useShoppingCount } from "@/lib/shopping-count-context";
 
 interface SidebarProps {
   user: {
@@ -17,11 +18,13 @@ interface SidebarProps {
 const navItems = [
   { href: "/dashboard", label: "Home", icon: Icons.home },
   { href: "/meals", label: "Meal Planner", icon: Icons.utensils },
+  { href: "/shopping", label: "Shopping", icon: Icons.cart },
   { href: "/trips", label: "Trip Planner", icon: Icons.map },
 ];
 
 export function Sidebar({ user }: SidebarProps) {
   const nav = usePendingNav();
+  const toBuyCount = useShoppingCount();
 
   return (
     <>
@@ -70,6 +73,14 @@ export function Sidebar({ user }: SidebarProps) {
                   {item.icon}
                 </span>
                 {item.label}
+                {item.href === "/shopping" && toBuyCount > 0 && (
+                  <span
+                    className="ml-auto min-w-5 h-5 px-1.5 rounded-full bg-[var(--color-brand-600)] text-white text-[11px] leading-5 text-center tabular-nums"
+                    aria-label={`${toBuyCount} to buy`}
+                  >
+                    {toBuyCount}
+                  </span>
+                )}
               </Link>
             );
           })}

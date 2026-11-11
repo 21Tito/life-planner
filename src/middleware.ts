@@ -35,6 +35,7 @@ export async function middleware(request: NextRequest) {
     request.nextUrl.pathname.startsWith("/dashboard") ||
     request.nextUrl.pathname.startsWith("/trips") ||
     request.nextUrl.pathname.startsWith("/meals") ||
+    request.nextUrl.pathname.startsWith("/shopping") ||
     request.nextUrl.pathname.startsWith("/settings");
 
   if (!user && isProtectedRoute) {
