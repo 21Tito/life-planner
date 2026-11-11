@@ -21,6 +21,7 @@ import { Icons } from "@/components/ui/icons";
 import { CategoryHeading } from "@/components/ui/category-icon";
 import { ErrorText, FieldLabel, Modal, nativeSelectClass } from "../meals/modal";
 import { useShoppingSync } from "./use-shopping-sync";
+import { useOnline } from "@/components/offline/offline-support";
 
 interface Props {
   items: ShoppingItem[];
@@ -62,6 +63,8 @@ export function ShoppingView({ items, setItems, setPantry, days, entries, recipe
   const [error, setError] = useState<string | null>(null);
   // Changes show immediately and sync in the background, waiting out lost signal
   const sync = useShoppingSync(setItems, setError);
+  const online = useOnline();
+  const offline = { offline: !online || sync.offline, changes: sync.waiting };
   const [copied, setCopied] = useState(false);
   const [editing, setEditing] = useState<ShoppingItem | null>(null);
   const [shopping, setShopping] = useState(false);
@@ -173,14 +176,14 @@ export function ShoppingView({ items, setItems, setPantry, days, entries, recipe
         onCloseFinish={() => setFinishing(false)}
         finish={finish}
         error={error}
-        offlineChanges={sync.offline ? sync.waiting : 0}
+        offline={offline}
       />
     );
   }
 
   return (
     <div className="max-w-2xl">
-      <OfflineNotice changes={sync.offline ? sync.waiting : 0} />
+      <OfflineNotice {...offline} />
       <div className="flex flex-wrap items-center gap-2 mb-4">
         <Button onClick={() => setShopping(true)} disabled={toBuy.length === 0 && inCart.length === 0} className="h-10 px-4 gap-1.5">
           {Icons.check}
@@ -339,13 +342,15 @@ export function ShoppingView({ items, setItems, setPantry, days, entries, recipe
   );
 }
 
-/** Shown while changes are saved on the device but can't reach the server */
-function OfflineNotice({ changes }: { changes: number }) {
-  if (changes === 0) return null;
+/** Shown without a connection; the list keeps working and changes wait on the device */
+function OfflineNotice({ offline, changes }: { offline: boolean; changes: number }) {
+  if (!offline) return null;
   return (
     <div role="status" className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-900">
       <span className="font-medium">You&apos;re offline.</span>{" "}
-      {changes} change{changes === 1 ? " is" : "s are"} saved on this device and will sync when you&apos;re back online.
+      {changes > 0
+        ? `${changes} change${changes === 1 ? " is" : "s are"} saved on this device and will sync when you're back online.`
+        : "Your list still works; changes sync when you're back online."}
     </div>
   );
 }
@@ -362,7 +367,7 @@ function ShoppingMode({
   onCloseFinish,
   finish,
   error,
-  offlineChanges,
+  offline,
 }: {
   toBuy: ShoppingItem[];
   inCart: ShoppingItem[];
@@ -373,7 +378,7 @@ function ShoppingMode({
   onCloseFinish: () => void;
   finish: (toKitchen: ShoppingItem[]) => Promise<string | null>;
   error: string | null;
-  offlineChanges: number;
+  offline: { offline: boolean; changes: number };
 }) {
   const total = toBuy.length + inCart.length;
 
@@ -394,7 +399,7 @@ function ShoppingMode({
         </Button>
       </div>
 
-      <OfflineNotice changes={offlineChanges} />
+      <OfflineNotice {...offline} />
       {error && <div className="mb-3"><ErrorText>{error}</ErrorText></div>}
 
       {toBuy.length === 0 ? (

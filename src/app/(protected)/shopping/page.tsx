@@ -30,6 +30,7 @@ export default async function ShoppingPage() {
   return (
     <ShoppingClient
       initialItems={(shopping.data ?? []) as ShoppingItem[]}
+      loadedAt={now}
       initialPantry={(pantry.data ?? []) as PantryItem[]}
       recipes={(recipes.data ?? []) as RecipeWithIngredients[]}
       entries={(entries.data ?? []) as MealPlanEntry[]}

@@ -7,6 +7,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Icons } from "@/components/ui/icons";
+import { clearOfflineData } from "@/lib/offline";
 
 interface UserMenuProps {
   user: {
@@ -49,6 +50,8 @@ export function UserMenu({ user, size = "default", dropdownPosition = "bottom-ri
   }, []);
 
   async function handleSignOut() {
+    // Saved offline pages hold this household's data
+    clearOfflineData();
     await supabase.auth.signOut();
     router.push("/login");
   }

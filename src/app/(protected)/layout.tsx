@@ -5,6 +5,7 @@ import { MobileNav } from "@/components/layout/mobile-nav";
 import { HouseholdProvider } from "@/lib/household-context";
 import { ShoppingCountProvider } from "@/lib/shopping-count-context";
 import { getHouseholdOwnerId } from "@/lib/get-owner-id";
+import { OfflineSupport } from "@/components/offline/offline-support";
 
 export default async function ProtectedLayout({
   children,
@@ -46,6 +47,7 @@ export default async function ProtectedLayout({
           />
           {/* Mobile padding clears the fixed header and the floating nav, plus the phone's safe areas */}
           <main className="flex-1 min-w-0 px-4 pt-[calc(5rem_+_env(safe-area-inset-top))] pb-[calc(7rem_+_env(safe-area-inset-bottom))] lg:px-10 lg:py-8 lg:pt-8 lg:pb-8">
+            <OfflineSupport />
             {children}
           </main>
           <MobileNav />
