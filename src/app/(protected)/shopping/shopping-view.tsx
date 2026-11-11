@@ -1,7 +1,7 @@
 "use client";
 
 import { createClient } from "@/lib/supabase/client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useOwnerId } from "@/lib/household-context";
 import type { MealPlanEntry, PantryItem, RecipeWithIngredients, ShoppingCategory, ShoppingItem } from "@/types";
 import {
@@ -25,6 +25,8 @@ import { useOnline } from "@/components/offline/offline-support";
 
 interface Props {
   items: ShoppingItem[];
+  /** The list as the server last sent it; a new one arrives when the page refreshes */
+  serverItems: ShoppingItem[];
   setItems: React.Dispatch<React.SetStateAction<ShoppingItem[]>>;
   setPantry: React.Dispatch<React.SetStateAction<PantryItem[]>>;
   /** The days shown on This Week; suggestions cover the same range */
@@ -53,7 +55,7 @@ function groupForStore(items: ShoppingItem[]) {
   }));
 }
 
-export function ShoppingView({ items, setItems, setPantry, days, entries, recipes, pantry }: Props) {
+export function ShoppingView({ items, serverItems, setItems, setPantry, days, entries, recipes, pantry }: Props) {
   const supabase = createClient();
   const ownerId = useOwnerId();
 
@@ -63,6 +65,13 @@ export function ShoppingView({ items, setItems, setPantry, days, entries, recipe
   const [error, setError] = useState<string | null>(null);
   // Changes show immediately and sync in the background, waiting out lost signal
   const sync = useShoppingSync(setItems, setError);
+  // A refreshed list from the server replaces ours, with unsynced changes kept on top
+  const firstServerItems = useRef(serverItems);
+  useEffect(() => {
+    if (serverItems !== firstServerItems.current) sync.adopt(serverItems);
+    // sync.adopt is a new function each render but always the same ShoppingSync
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [serverItems]);
   const online = useOnline();
   const offline = { offline: !online || sync.offline, changes: sync.waiting };
   const [copied, setCopied] = useState(false);

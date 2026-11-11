@@ -1,13 +1,11 @@
-import { createClient } from "@/lib/supabase/server";
-import { getVerifiedIds } from "@/lib/get-owner-id";
+import { requirePageSession } from "@/lib/page-session";
 import type { MealPlanEntry, PantryItem, RecipeWithIngredients, ShoppingItem } from "@/types";
 import { ShoppingClient } from "./shopping-client";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 export default async function ShoppingPage() {
-  const supabase = await createClient();
-  const { ownerId } = await getVerifiedIds(supabase);
+  const { supabase, ownerId } = await requirePageSession();
 
   // The server clock is UTC; this covers the viewer's next 7 days in any timezone,
   // for the "Needed for the next 7 days" suggestions

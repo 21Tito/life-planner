@@ -14,6 +14,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { StickyTabs } from "@/components/ui/sticky-tabs";
 import { Icons } from "@/components/ui/icons";
+import { useServerState } from "@/lib/use-server-state";
 
 type TripsTab = "upcoming" | "completed";
 
@@ -29,7 +30,8 @@ type CreationMode = "manual" | "csv";
 export function TripsClient({ initialTrips, initialTab, startWithNewTrip = false }: Props) {
   const supabase = createClient();
   const router = useRouter();
-  const [trips, setTrips] = useState<Trip[]>(initialTrips);
+  // Replaced when the page refreshes (e.g. after opening from a saved copy)
+  const [trips, setTrips] = useServerState<Trip[]>(initialTrips);
   const [tab, setTab] = useState<TripsTab>(initialTab);
 
   function switchTab(next: TripsTab) {

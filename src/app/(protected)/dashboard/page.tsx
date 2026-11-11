@@ -1,13 +1,11 @@
-import { createClient } from "@/lib/supabase/server";
-import { getVerifiedIds } from "@/lib/get-owner-id";
+import { requirePageSession } from "@/lib/page-session";
 import type { MealPlanEntry, PantryItem, RecipeWithIngredients, Trip } from "@/types";
 import { DashboardClient } from "./dashboard-client";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 export default async function DashboardPage() {
-  const supabase = await createClient();
-  const { ownerId } = await getVerifiedIds(supabase);
+  const { supabase, ownerId } = await requirePageSession();
 
   // The server clock is UTC; this window covers the viewer's current week in any timezone
   const now = Date.now();

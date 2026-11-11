@@ -1,12 +1,10 @@
-import { createClient } from "@/lib/supabase/server";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
-import { getVerifiedIds } from "@/lib/get-owner-id";
+import { requirePageSession } from "@/lib/page-session";
 import { SettingsClient } from "./settings-client";
 import { mcpResourceUrl } from "@/lib/oauth";
 
 export default async function SettingsPage() {
-  const supabase = await createClient();
-  const { userId } = await getVerifiedIds(supabase);
+  const { supabase, userId } = await requirePageSession();
 
   const [{ data: membersRaw }, { data: invite }, { data: ownMembership }, { data: grants }] =
     await Promise.all([

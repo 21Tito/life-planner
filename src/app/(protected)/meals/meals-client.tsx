@@ -17,6 +17,7 @@ import { WeekView } from "./week-view";
 import { RecipesView } from "./recipes-view";
 import { KitchenView } from "./kitchen-view";
 import { useSyncShoppingCount } from "@/lib/shopping-count-context";
+import { useServerState } from "@/lib/use-server-state";
 
 const MAX_DAYS_SHOWN = 35;
 
@@ -63,12 +64,13 @@ export function MealsClient({
   const ownerId = useOwnerId();
 
   const [tab, setTab] = useState<MealsTab>(initialTab);
-  const [pantry, setPantry] = useState<PantryItem[]>(initialPantry);
-  const [reviewedAt, setReviewedAt] = useState<string | null>(initialReviewedAt);
-  const [recipes, setRecipes] = useState<RecipeWithIngredients[]>(() => sortIngredients(initialRecipes));
-  const [entries, setEntries] = useState<MealPlanEntry[]>(initialEntries);
+  // Server data, replaced when the page refreshes (e.g. after opening from a saved copy)
+  const [pantry, setPantry] = useServerState<PantryItem[]>(initialPantry);
+  const [reviewedAt, setReviewedAt] = useServerState<string | null>(initialReviewedAt);
+  const [recipes, setRecipes] = useServerState(initialRecipes, sortIngredients);
+  const [entries, setEntries] = useServerState<MealPlanEntry[]>(initialEntries);
   // Week and recipes read the list, and Done cooking adds to it
-  const [shoppingItems, setShoppingItems] = useState<ShoppingItem[]>(initialShopping);
+  const [shoppingItems, setShoppingItems] = useServerState<ShoppingItem[]>(initialShopping);
   useSyncShoppingCount(shoppingItems);
   const [openRecipe, setOpenRecipe] = useState<OpenRecipe>(initialOpenRecipe);
   const [editingSlot, setEditingSlot] = useState<EditingSlot>(null);
@@ -79,6 +81,11 @@ export function MealsClient({
   const [dayCount, setDayCount] = useState(PLANNED_DAYS);
   const [loadingMore, setLoadingMore] = useState(false);
   const loadedThrough = useRef(initialEntriesRange.to);
+  // Refreshed entries cover the starting window again, so This Week goes back to it
+  useEffect(() => {
+    loadedThrough.current = initialEntriesRange.to;
+    setDayCount(PLANNED_DAYS);
+  }, [initialEntries, initialEntriesRange.to]);
 
   useEffect(() => {
     const today = new Date();

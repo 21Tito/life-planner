@@ -1,28 +1,26 @@
-import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { Sidebar } from "@/components/layout/sidebar";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { HouseholdProvider } from "@/lib/household-context";
 import { ShoppingCountProvider } from "@/lib/shopping-count-context";
-import { getHouseholdOwnerId } from "@/lib/get-owner-id";
+import { getPageSession, getPageUser } from "@/lib/page-session";
 import { OfflineSupport } from "@/components/offline/offline-support";
+import { KeepFresh } from "@/components/offline/keep-fresh";
 
 export default async function ProtectedLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const supabase = await createClient();
+  const user = await getPageUser();
+  if (!user) redirect("/login");
+  const { supabase, userId, email } = user;
 
-  // Verified locally against the project's signing keys; no Auth server round trip
-  const { data } = await supabase.auth.getClaims();
-  const userId = data?.claims?.sub;
-  if (!userId) redirect("/login");
-  const email = typeof data?.claims?.email === "string" ? data.claims.email : "";
-
+  // The household lookup is shared with the page, which runs alongside this layout
   const [{ data: profile }, { ownerId, toBuyCount }] = await Promise.all([
     supabase.from("profiles").select("full_name, avatar_url").eq("id", userId).single(),
-    getHouseholdOwnerId(supabase, userId).then(async (ownerId) => {
+    getPageSession().then(async (session) => {
+      const ownerId = session?.ownerId ?? userId;
       // For the badge on the Shopping nav item
       const { count } = await supabase
         .from("shopping_items")
@@ -52,6 +50,8 @@ export default async function ProtectedLayout({
           </main>
           <MobileNav />
         </div>
+        {/* Pages may open from a saved copy; this brings in current data */}
+        <KeepFresh renderedAt={Date.now()} />
       </ShoppingCountProvider>
     </HouseholdProvider>
   );

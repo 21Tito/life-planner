@@ -1,5 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
-import { getVerifiedIds } from "@/lib/get-owner-id";
+import { requirePageSession } from "@/lib/page-session";
 import { TripsClient } from "./trips-client";
 
 export default async function TripsPage({
@@ -8,8 +7,7 @@ export default async function TripsPage({
   searchParams: Promise<{ tab?: string; new?: string }>;
 }) {
   const { tab, new: startNew } = await searchParams;
-  const supabase = await createClient();
-  const { ownerId } = await getVerifiedIds(supabase);
+  const { supabase, ownerId } = await requirePageSession();
 
   const { data: trips } = await supabase
     .from("trips")

@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useOwnerId } from "@/lib/household-context";
 import type { TripDay, TripActivity, ActivityCategory, TripHotel } from "@/types";
 import { PlacesInput } from "@/components/ui/places-input";
+import { useServerState } from "@/lib/use-server-state";
 
 // ─── Category config ──────────────────────────────────────────────────────────
 
@@ -1874,9 +1875,10 @@ export function TripCalendarView({
   const supabase = createClient();
   const userId = useOwnerId();
 
-  const [days, setDays] = useState<DayWithActivities[]>(initialDays);
+  // Replaced when the page refreshes (e.g. after opening from a saved copy)
+  const [days, setDays] = useServerState<DayWithActivities[]>(initialDays);
   // null = never set; non-null = explicitly chosen (including "UTC")
-  const [timezone, setTimezone] = useState<string | null>(initialTimezone);
+  const [timezone, setTimezone] = useServerState<string | null>(initialTimezone);
   const [view, setView] = useState<"calendar" | "list">("calendar");
   const [editorState, setEditorState] = useState<EditorState | null>(null);
   const [saving, setSaving] = useState(false);
@@ -1892,7 +1894,7 @@ export function TripCalendarView({
   } | null>(null);
 
   // ── Hotels ──
-  const [hotels, setHotels] = useState<TripHotel[]>(initialHotels);
+  const [hotels, setHotels] = useServerState<TripHotel[]>(initialHotels);
   const [hotelModal, setHotelModal] = useState<{
     open: boolean;
     hotel: TripHotel | null;

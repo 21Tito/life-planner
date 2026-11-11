@@ -116,6 +116,11 @@ export class ShoppingSync {
     void this.flush();
   }
 
+  /** Takes a fresh list from the server, keeping this device's unsynced changes on top. */
+  adopt(serverItems: ShoppingItem[]) {
+    this.callbacks.setItems(() => applyPending(serverItems, this.pending));
+  }
+
   private resolve(id: string) {
     return this.idMap.get(id) ?? id;
   }

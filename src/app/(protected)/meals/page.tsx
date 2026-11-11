@@ -1,5 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
-import { getVerifiedIds } from "@/lib/get-owner-id";
+import { requirePageSession } from "@/lib/page-session";
 import type { MealPlanEntry, PantryItem, RecipeWithIngredients, ShoppingItem } from "@/types";
 import { redirect } from "next/navigation";
 import { MealsClient, type MealsTab } from "./meals-client";
@@ -18,8 +17,7 @@ export default async function MealsPage({
   if (requestedTab === "shopping") redirect("/shopping");
   // The Kitchen tab used to be called Fridge; keep old links working
   const tab = requestedTab === "fridge" ? "kitchen" : requestedTab;
-  const supabase = await createClient();
-  const { ownerId } = await getVerifiedIds(supabase);
+  const { supabase, ownerId } = await requirePageSession();
 
   // The server clock is UTC; this window covers the viewer's current week in any timezone
   const now = Date.now();

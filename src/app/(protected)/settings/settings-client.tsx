@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useServerState } from "@/lib/use-server-state";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ClaudeConnector, type Connection } from "./claude-connector";
@@ -24,8 +25,9 @@ interface Props {
 
 export function SettingsClient({ members, activeToken, isMember, ownerName, connectorUrl, connections }: Props) {
   const router = useRouter();
-  const [currentMembers, setCurrentMembers] = useState<Member[]>(members);
-  const [token, setToken] = useState<string | null>(activeToken);
+  // Replaced when the page refreshes (e.g. after opening from a saved copy)
+  const [currentMembers, setCurrentMembers] = useServerState<Member[]>(members);
+  const [token, setToken] = useServerState<string | null>(activeToken);
   const [generating, setGenerating] = useState(false);
   const [copied, setCopied] = useState(false);
   const [removing, setRemoving] = useState<string | null>(null);

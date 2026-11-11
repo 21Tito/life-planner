@@ -49,6 +49,8 @@ export function useShoppingSync(
     add: sync.add.bind(sync),
     update: sync.update.bind(sync),
     remove: sync.remove.bind(sync),
+    /** A refreshed list from the server, with unsynced changes kept on top */
+    adopt: sync.adopt.bind(sync),
     /** Sends everything now; true when nothing is left waiting */
     sync: sync.flush.bind(sync),
     /** Changes saved on this device that haven't reached the server yet */

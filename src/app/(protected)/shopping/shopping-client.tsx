@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useServerState } from "@/lib/use-server-state";
 import type { MealPlanEntry, PantryItem, RecipeWithIngredients, ShoppingItem } from "@/types";
 import { PLANNED_DAYS, dayRange } from "@/lib/meals";
 import { useOwnerId } from "@/lib/household-context";
@@ -33,16 +34,21 @@ function readSnapshot(key: string): ListSnapshot | null {
 
 export function ShoppingClient({ initialItems, loadedAt, initialPantry, recipes, entries }: Props) {
   const ownerId = useOwnerId();
+  // Refreshed lists from the server are taken in by ShoppingView, which keeps unsynced changes
   const [items, setItems] = useState<ShoppingItem[]>(initialItems);
-  const [pantry, setPantry] = useState<PantryItem[]>(initialPantry);
+  const [pantry, setPantry] = useServerState<PantryItem[]>(initialPantry);
   useSyncShoppingCount(items);
 
-  // Offline, this page may be a saved copy from earlier, older than the list you last saw.
-  // The device keeps that list too; whichever is newer wins. (Declared before the save below.)
+  // This page may open from a saved copy, older than the list you last saw. The device keeps
+  // that list too; whichever is newer wins. Only on arrival: a refresh brings current data.
+  // (Declared before the save below.)
+  const firstLoadedAt = useRef(loadedAt);
   useEffect(() => {
     const snapshot = readSnapshot(listSnapshotKey(ownerId));
-    if (snapshot && snapshot.savedAt > loadedAt && Array.isArray(snapshot.items)) setItems(snapshot.items);
-  }, [ownerId, loadedAt]);
+    if (snapshot && snapshot.savedAt > firstLoadedAt.current && Array.isArray(snapshot.items)) {
+      setItems(snapshot.items);
+    }
+  }, [ownerId]);
 
   useEffect(() => {
     try {
@@ -64,6 +70,7 @@ export function ShoppingClient({ initialItems, loadedAt, initialPantry, recipes,
       <h1 className="sr-only">Shopping list</h1>
       <ShoppingView
         items={items}
+        serverItems={initialItems}
         setItems={setItems}
         setPantry={setPantry}
         days={days}
