@@ -20,6 +20,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Icons } from "@/components/ui/icons";
 import { CategoryHeading } from "@/components/ui/category-icon";
 import { ErrorText, FieldLabel, Modal, nativeSelectClass } from "../meals/modal";
+import { useShoppingSync } from "./use-shopping-sync";
 
 interface Props {
   items: ShoppingItem[];
@@ -58,8 +59,9 @@ export function ShoppingView({ items, setItems, setPantry, days, entries, recipe
   const [name, setName] = useState("");
   const [category, setCategory] = useState<ShoppingCategory>("other");
   const [categoryTouched, setCategoryTouched] = useState(false);
-  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Changes show immediately and sync in the background, waiting out lost signal
+  const sync = useShoppingSync(setItems, setError);
   const [copied, setCopied] = useState(false);
   const [editing, setEditing] = useState<ShoppingItem | null>(null);
   const [shopping, setShopping] = useState(false);
@@ -68,65 +70,40 @@ export function ShoppingView({ items, setItems, setPantry, days, entries, recipe
   const toBuy = items.filter((i) => !i.checked);
   const inCart = items.filter((i) => i.checked);
 
-  async function addItems(rows: { name: string; category: ShoppingCategory }[]) {
-    if (rows.length === 0) return;
-    setBusy(true);
+  function addItems(rows: { name: string; category: ShoppingCategory }[]) {
     setError(null);
-    const { data, error } = await supabase
-      .from("shopping_items")
-      .insert(rows.map((r) => ({ user_id: ownerId, name: r.name, category: r.category })))
-      .select();
-    setBusy(false);
-    if (error || !data) {
-      setError(error?.message ?? "Couldn't add to the list.");
-      return false;
-    }
-    setItems((prev) => [...prev, ...(data as ShoppingItem[])]);
-    return true;
+    sync.add(rows);
   }
 
-  async function addFromForm(e: React.FormEvent) {
+  function addFromForm(e: React.FormEvent) {
     e.preventDefault();
     const trimmed = name.trim();
-    if (!trimmed || busy) return;
-    if (await addItems([{ name: trimmed, category }])) {
-      setName("");
-      setCategory("other");
-      setCategoryTouched(false);
-    }
+    if (!trimmed) return;
+    addItems([{ name: trimmed, category }]);
+    setName("");
+    setCategory("other");
+    setCategoryTouched(false);
   }
 
-  async function toggle(item: ShoppingItem) {
-    const checked = !item.checked;
-    setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, checked } : i)));
-    const { error } = await supabase.from("shopping_items").update({ checked }).eq("id", item.id);
-    if (error) {
-      setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, checked: item.checked } : i)));
-      setError(error.message);
-    }
+  function toggle(item: ShoppingItem) {
+    sync.update(item.id, { checked: !item.checked });
   }
 
-  async function remove(item: ShoppingItem) {
-    const { error } = await supabase.from("shopping_items").delete().eq("id", item.id);
-    if (error) {
-      setError(error.message);
-      return;
-    }
-    setItems((prev) => prev.filter((i) => i.id !== item.id));
+  function remove(item: ShoppingItem) {
+    sync.remove([item.id]);
   }
 
   async function saveEdit(updated: ShoppingItem): Promise<string | null> {
-    const { error } = await supabase
-      .from("shopping_items")
-      .update({ name: updated.name, category: updated.category })
-      .eq("id", updated.id);
-    if (error) return error.message;
-    setItems((prev) => prev.map((i) => (i.id === updated.id ? updated : i)));
+    sync.update(updated.id, { name: updated.name, category: updated.category });
     return null;
   }
 
   /** Adds the chosen checked items to the kitchen and clears every checked item off the list. */
   async function finish(toKitchen: ShoppingItem[]): Promise<string | null> {
+    // The kitchen isn't kept offline, so putting away waits for a connection
+    if (!(await sync.sync())) {
+      return "You're offline. Your list is saved on this phone; put groceries away once you're back online.";
+    }
     if (toKitchen.length > 0) {
       const { data, error } = await supabase
         .from("pantry_items")
@@ -141,10 +118,7 @@ export function ShoppingView({ items, setItems, setPantry, days, entries, recipe
       if (error || !data) return error?.message ?? "Couldn't add to your kitchen.";
       setPantry((prev) => [...prev, ...(data as PantryItem[])]);
     }
-    const ids = inCart.map((i) => i.id);
-    const { error } = await supabase.from("shopping_items").delete().in("id", ids);
-    if (error) return error.message;
-    setItems((prev) => prev.filter((i) => !ids.includes(i.id)));
+    sync.remove(inCart.map((i) => i.id));
     setShopping(false);
     return null;
   }
@@ -199,12 +173,14 @@ export function ShoppingView({ items, setItems, setPantry, days, entries, recipe
         onCloseFinish={() => setFinishing(false)}
         finish={finish}
         error={error}
+        offlineChanges={sync.offline ? sync.waiting : 0}
       />
     );
   }
 
   return (
     <div className="max-w-2xl">
+      <OfflineNotice changes={sync.offline ? sync.waiting : 0} />
       <div className="flex flex-wrap items-center gap-2 mb-4">
         <Button onClick={() => setShopping(true)} disabled={toBuy.length === 0 && inCart.length === 0} className="h-10 px-4 gap-1.5">
           {Icons.check}
@@ -243,7 +219,7 @@ export function ShoppingView({ items, setItems, setPantry, days, entries, recipe
                 <option key={c.value} value={c.value}>{c.label}</option>
               ))}
             </select>
-            <Button type="submit" disabled={!name.trim() || busy} className="h-10 px-4 gap-1.5">
+            <Button type="submit" disabled={!name.trim()} className="h-10 px-4 gap-1.5">
               {Icons.plus}
               Add
             </Button>
@@ -328,7 +304,6 @@ export function ShoppingView({ items, setItems, setPantry, days, entries, recipe
             <Button
               variant="outline"
               size="sm"
-              disabled={busy}
               onClick={() => addItems(suggestions.map(suggestionRow))}
             >
               Add all
@@ -344,7 +319,6 @@ export function ShoppingView({ items, setItems, setPantry, days, entries, recipe
                 <Button
                   variant="outline"
                   size="sm"
-                  disabled={busy}
                   onClick={() => addItems([suggestionRow(line)])}
                   className="flex-shrink-0 gap-1"
                 >
@@ -365,6 +339,17 @@ export function ShoppingView({ items, setItems, setPantry, days, entries, recipe
   );
 }
 
+/** Shown while changes are saved on the device but can't reach the server */
+function OfflineNotice({ changes }: { changes: number }) {
+  if (changes === 0) return null;
+  return (
+    <div role="status" className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-900">
+      <span className="font-medium">You&apos;re offline.</span>{" "}
+      {changes} change{changes === 1 ? " is" : "s are"} saved on this device and will sync when you&apos;re back online.
+    </div>
+  );
+}
+
 // ── At the store: big tap targets, one item at a time ────────────────────────
 
 function ShoppingMode({
@@ -377,6 +362,7 @@ function ShoppingMode({
   onCloseFinish,
   finish,
   error,
+  offlineChanges,
 }: {
   toBuy: ShoppingItem[];
   inCart: ShoppingItem[];
@@ -387,6 +373,7 @@ function ShoppingMode({
   onCloseFinish: () => void;
   finish: (toKitchen: ShoppingItem[]) => Promise<string | null>;
   error: string | null;
+  offlineChanges: number;
 }) {
   const total = toBuy.length + inCart.length;
 
@@ -407,6 +394,7 @@ function ShoppingMode({
         </Button>
       </div>
 
+      <OfflineNotice changes={offlineChanges} />
       {error && <div className="mb-3"><ErrorText>{error}</ErrorText></div>}
 
       {toBuy.length === 0 ? (
