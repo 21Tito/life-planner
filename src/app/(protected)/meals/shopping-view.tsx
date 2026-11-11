@@ -3,12 +3,13 @@
 import { createClient } from "@/lib/supabase/client";
 import { useEffect, useState } from "react";
 import { useOwnerId } from "@/lib/household-context";
-import type { MealPlanEntry, PantryCategory, PantryItem, RecipeWithIngredients, ShoppingItem } from "@/types";
+import type { MealPlanEntry, PantryItem, RecipeWithIngredients, ShoppingCategory, ShoppingItem } from "@/types";
 import {
-  PANTRY_CATEGORIES,
+  SHOPPING_CATEGORIES,
   STORE_CATEGORY_ORDER,
   buildShoppingList,
   guessCategory,
+  guessShoppingCategory,
   isOnList,
   toDateStr,
 } from "@/lib/meals";
@@ -17,6 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Icons } from "@/components/ui/icons";
+import { CategoryHeading } from "@/components/ui/category-icon";
 import { ErrorText, FieldLabel, Modal, nativeSelectClass } from "./modal";
 
 interface Props {
@@ -30,12 +32,16 @@ interface Props {
   pantry: PantryItem[];
 }
 
-const CATEGORY_LABELS = new Map(PANTRY_CATEGORIES.map((c) => [c.value, c.label]));
+const CATEGORY_LABELS = new Map(SHOPPING_CATEGORIES.map((c) => [c.value, c.label]));
+
+const categoryOf = (item: ShoppingItem) => item.category ?? guessShoppingCategory(item.name);
+/** Household supplies come off the list but never go into the kitchen */
+const isHousehold = (item: ShoppingItem) => categoryOf(item) === "household";
 
 function groupForStore(items: ShoppingItem[]) {
-  const byCategory = new Map<PantryCategory, ShoppingItem[]>();
+  const byCategory = new Map<ShoppingCategory, ShoppingItem[]>();
   for (const item of items) {
-    const category = item.category ?? guessCategory(item.name);
+    const category = categoryOf(item);
     byCategory.set(category, [...(byCategory.get(category) ?? []), item]);
   }
   return STORE_CATEGORY_ORDER.filter((c) => byCategory.has(c)).map((c) => ({
@@ -50,7 +56,7 @@ export function ShoppingView({ items, setItems, setPantry, days, entries, recipe
   const ownerId = useOwnerId();
 
   const [name, setName] = useState("");
-  const [category, setCategory] = useState<PantryCategory>("other");
+  const [category, setCategory] = useState<ShoppingCategory>("other");
   const [categoryTouched, setCategoryTouched] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -62,7 +68,7 @@ export function ShoppingView({ items, setItems, setPantry, days, entries, recipe
   const toBuy = items.filter((i) => !i.checked);
   const inCart = items.filter((i) => i.checked);
 
-  async function addItems(rows: { name: string; category: PantryCategory }[]) {
+  async function addItems(rows: { name: string; category: ShoppingCategory }[]) {
     if (rows.length === 0) return;
     setBusy(true);
     setError(null);
@@ -128,7 +134,7 @@ export function ShoppingView({ items, setItems, setPantry, days, entries, recipe
           toKitchen.map((i) => ({
             user_id: ownerId,
             name: i.name,
-            category: i.category ?? guessCategory(i.name),
+            category: i.category && i.category !== "household" ? i.category : guessCategory(i.name),
           }))
         )
         .select();
@@ -215,11 +221,11 @@ export function ShoppingView({ items, setItems, setPantry, days, entries, recipe
         <CardContent>
           <form onSubmit={addFromForm} className="flex flex-col sm:flex-row gap-2">
             <Input
-              placeholder="Add an item, e.g. tofu"
+              placeholder="Add an item, e.g. tofu or paper towels"
               value={name}
               onChange={(e) => {
                 setName(e.target.value);
-                if (!categoryTouched) setCategory(guessCategory(e.target.value));
+                if (!categoryTouched) setCategory(guessShoppingCategory(e.target.value));
               }}
               maxLength={200}
               className="h-10 text-sm flex-1"
@@ -227,13 +233,13 @@ export function ShoppingView({ items, setItems, setPantry, days, entries, recipe
             <select
               value={category}
               onChange={(e) => {
-                setCategory(e.target.value as PantryCategory);
+                setCategory(e.target.value as ShoppingCategory);
                 setCategoryTouched(true);
               }}
               className={`${nativeSelectClass} sm:w-40`}
               aria-label="Category"
             >
-              {PANTRY_CATEGORIES.map((c) => (
+              {SHOPPING_CATEGORIES.map((c) => (
                 <option key={c.value} value={c.value}>{c.label}</option>
               ))}
             </select>
@@ -257,9 +263,7 @@ export function ShoppingView({ items, setItems, setPantry, days, entries, recipe
         <div className="space-y-6">
           {groupForStore(toBuy).map((group) => (
             <section key={group.category}>
-              <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
-                {group.label}
-              </h2>
+              <CategoryHeading category={group.category} label={group.label} />
               <ul className="rounded-xl ring-1 ring-foreground/10 bg-card divide-y divide-border">
                 {group.items.map((item) => (
                   <li key={item.id} className="flex items-center gap-2 pl-2 pr-2 py-1">
@@ -411,9 +415,7 @@ function ShoppingMode({
         <div className="space-y-5 mb-8">
           {groupForStore(toBuy).map((group) => (
             <section key={group.category}>
-              <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
-                {group.label}
-              </h2>
+              <CategoryHeading category={group.category} label={group.label} />
               <ul className="space-y-2">
                 {group.items.map((item) => (
                   <li key={item.id}>
@@ -469,7 +471,9 @@ function FinishModal({
   onClose: () => void;
   finish: (toKitchen: ShoppingItem[]) => Promise<string | null>;
 }) {
-  const [selected, setSelected] = useState<Set<string>>(() => new Set(inCart.map((i) => i.id)));
+  const groceries = inCart.filter((i) => !isHousehold(i));
+  const householdCount = inCart.length - groceries.length;
+  const [selected, setSelected] = useState<Set<string>>(() => new Set(groceries.map((i) => i.id)));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -484,7 +488,7 @@ function FinishModal({
 
   async function done() {
     setSaving(true);
-    const err = await finish(inCart.filter((i) => selected.has(i.id)));
+    const err = await finish(groceries.filter((i) => selected.has(i.id)));
     setSaving(false);
     if (err) setError(err);
     else onClose();
@@ -504,10 +508,13 @@ function FinishModal({
       }
     >
       <p className="text-sm text-muted-foreground mb-3">
-        Everything in the cart comes off the list. Uncheck anything you don&apos;t want to track in your kitchen.
+        Everything in the cart comes off the list.
+        {groceries.length > 0 && " Uncheck anything you don't want to track in your kitchen."}
+        {householdCount > 0 &&
+          ` ${householdCount === 1 ? "The household item doesn't" : `The ${householdCount} household items don't`} go into the kitchen.`}
       </p>
       <ul className="space-y-1">
-        {inCart.map((item) => (
+        {groceries.map((item) => (
           <li key={item.id}>
             <label className="flex items-center gap-3 py-1.5 text-sm cursor-pointer">
               <input
@@ -536,7 +543,7 @@ function EditItemModal({
   onSave: (item: ShoppingItem) => Promise<string | null>;
 }) {
   const [name, setName] = useState(item.name);
-  const [category, setCategory] = useState<PantryCategory>(item.category ?? guessCategory(item.name));
+  const [category, setCategory] = useState<ShoppingCategory>(categoryOf(item));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -571,10 +578,10 @@ function EditItemModal({
           <FieldLabel>Category</FieldLabel>
           <select
             value={category}
-            onChange={(e) => setCategory(e.target.value as PantryCategory)}
+            onChange={(e) => setCategory(e.target.value as ShoppingCategory)}
             className={nativeSelectClass}
           >
-            {PANTRY_CATEGORIES.map((c) => (
+            {SHOPPING_CATEGORIES.map((c) => (
               <option key={c.value} value={c.value}>{c.label}</option>
             ))}
           </select>

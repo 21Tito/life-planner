@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useRef, useState } from "react";
 import { useOwnerId } from "@/lib/household-context";
 import type { PantryCategory, PantryItem } from "@/types";
+import { CategoryHeading } from "@/components/ui/category-icon";
 import {
   EXPIRY_CATEGORIES,
   PANTRY_CATEGORIES,
@@ -189,9 +190,7 @@ export function KitchenView({ pantry, setPantry, reviewAge, onReviewed, now }: P
         <div className="space-y-6">
           {groups.map((group) => (
             <section key={group.value}>
-              <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
-                {group.label}
-              </h2>
+              <CategoryHeading category={group.value} label={group.label} />
               <ul className="rounded-xl ring-1 ring-foreground/10 bg-card divide-y divide-border">
                 {group.items.map((item) => (
                   <li key={item.id} className="flex items-center gap-2 pl-4 pr-2 py-1.5">

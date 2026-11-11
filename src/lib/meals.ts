@@ -4,6 +4,7 @@ import type {
   PantryItem,
   RecipeIngredient,
   RecipeWithIngredients,
+  ShoppingCategory,
 } from "@/types";
 
 export const PLANNED_DAYS = 7; // Sunday–Saturday
@@ -368,9 +369,16 @@ export function expiryStatus(expiry: string, now: Date): "expired" | "soon" | "o
   return daysLeft <= EXPIRING_SOON_DAYS ? "soon" : "ok";
 }
 
+/** Kitchen categories plus Household, which only exists on the shopping list */
+export const SHOPPING_CATEGORIES: { value: ShoppingCategory; label: string }[] = [
+  ...PANTRY_CATEGORIES.filter((c) => c.value !== "other"),
+  { value: "household", label: "Household" },
+  { value: "other", label: "Other" },
+];
+
 // Roughly the order you walk a grocery store: produce first, then proteins and dairy
-export const STORE_CATEGORY_ORDER: PantryCategory[] = [
-  "vegetable", "fruit", "protein", "dairy", "grain", "frozen", "condiment", "spice", "beverage", "other",
+export const STORE_CATEGORY_ORDER: ShoppingCategory[] = [
+  "vegetable", "fruit", "protein", "dairy", "grain", "frozen", "condiment", "spice", "beverage", "household", "other",
 ];
 
 /** Whether something with this name is already on the list (same loose matching as the kitchen). */
@@ -398,4 +406,23 @@ export function guessCategory(name: string): PantryCategory {
     }
   }
   return "other";
+}
+
+// Singular forms, since names are matched by ingredientTokens
+const HOUSEHOLD_WORDS = new Set([
+  "towel", "toilet", "tissue", "kleenex", "napkin", "parchment", "foil", "plastic", "ziploc",
+  "trash", "garbage", "sponge", "detergent", "soap", "bleach", "cleaner", "disinfectant",
+  "sanitizer", "wipe", "dishwasher", "laundry", "softener", "freshener", "shampoo",
+  "conditioner", "toothpaste", "toothbrush", "floss", "mouthwash", "deodorant", "razor",
+  "lotion", "sunscreen", "bandage", "battery", "lightbulb", "diaper", "tampon", "litter",
+]);
+
+/** Like guessCategory, but also spots household supplies: "paper towels", "dishwasher pods". */
+export function guessShoppingCategory(name: string): ShoppingCategory {
+  // Last word first, as in guessCategory: "lemon dish soap" is household, "paper towel" too
+  for (const token of [...ingredientTokens(name)].reverse()) {
+    if (HOUSEHOLD_WORDS.has(token)) return "household";
+    if (CATEGORY_KEYWORDS.some(([, words]) => words.includes(token))) break;
+  }
+  return guessCategory(name);
 }

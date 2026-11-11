@@ -100,6 +100,9 @@ export type PantryCategory =
   | "beverage"
   | "other";
 
+/** The shopping list also takes non-food supplies, which never go into the kitchen */
+export type ShoppingCategory = PantryCategory | "household";
+
 export interface PantryItem {
   id: string;
   user_id: string;
@@ -157,7 +160,7 @@ export interface ShoppingItem {
   user_id: string;
   name: string;
   /** Null means "guess from the name" */
-  category: PantryCategory | null;
+  category: ShoppingCategory | null;
   checked: boolean;
   created_at: string;
 }
